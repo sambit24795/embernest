@@ -1,0 +1,24 @@
+{
+  "comfyUrl": "http://127.0.0.1:8188",
+  "port": 3000,
+  "listenOnLan": true,
+  "comfyRestartCommand": "",
+  "allowComfyRestart": false,
+  "tokens": {
+    "civitai": "",
+    "hf": "",
+    "modelscope": "",
+    "github": ""
+  },
+  "defaults": {
+    "denoise": 0.9,
+    "steps": 28,
+    "cfg": 7,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "seed": -1,
+    "maxSize": 768,
+    "preserveFace": true,
+    "restoreSize": true
+  }
+}

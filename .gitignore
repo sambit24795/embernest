@@ -1,0 +1,9 @@
+# Dependencies
+node_modules/
+
+# Local secrets / machine-specific config — NEVER commit this
+config.json
+
+# Logs & OS junk
+*.log
+.DS_Store

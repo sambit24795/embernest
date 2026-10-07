@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>PixelKiln — Forge your pixels</title>
+  <meta name="description" content="Local ComfyUI front-end for image editing and model browsing." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23ff7a18' d='M24 3c3 6 9 8 9 16a9 9 0 0 1-18 0c0-4 2-6 4-9 1 2 2 3 4 3-1-4-1-7 1-10z'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <!-- ===================== Header ===================== -->
+  <header class="site-header">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true">
+        <defs>
+          <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#e8590c" />
+            <stop offset="0.5" stop-color="#ff7a18" />
+            <stop offset="1" stop-color="#ffb347" />
+          </linearGradient>
+        </defs>
+        <path fill="url(#flame)" d="M24 3c3 6 9 8 9 16a9 9 0 0 1-18 0c0-4 2-6 4-9 1 2 2 3 4 3-1-4-1-7 1-10z" />
+        <rect x="9" y="38" width="6" height="6" rx="1" fill="#ffb347" />
+        <rect x="21" y="38" width="6" height="6" rx="1" fill="#ff7a18" />
+        <rect x="33" y="38" width="6" height="6" rx="1" fill="#e8590c" />
+      </svg>
+      <div class="brand-text">
+        <span class="wordmark">Pixel<span class="wordmark-accent">Kiln</span></span>
+        <span class="tagline">Forge your pixels</span>
+      </div>
+    </div>
+    <button class="status-pill" id="statusPill" type="button" title="ComfyUI status — click to refresh">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Checking ComfyUI…</span>
+    </button>
+  </header>
+
+  <!-- ===================== Tabs ===================== -->
+  <nav class="tabs" role="tablist" aria-label="Main sections">
+    <button class="tab is-active" role="tab" aria-selected="true" data-tab="edit">✎ Edit</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="generate">✨ Generate</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="transform">♻ Transform</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="models">☲ Models</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="settings">⚙ Settings</button>
+  </nav>
+
+  <main>
+    <!-- ===================== EDIT ===================== -->
+    <section class="panel-page" id="tab-edit" role="tabpanel" aria-label="Edit">
+      <div class="edit-layout">
+        <!-- Left: upload + settings -->
+        <div class="edit-side">
+          <div class="card rec-banner" id="editRecBanner" hidden>
+            <p id="editRecText"></p>
+            <button class="btn btn-ghost" id="resetRecommendedBtn" type="button">Reset to recommended</button>
+          </div>
+
+          <div class="card">
+            <h2>Source image</h2>
+            <label class="dropzone" id="dropzone" tabindex="0">
+              <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/bmp" hidden />
+              <img id="inputPreview" class="dropzone-preview" alt="" hidden />
+              <div class="dropzone-hint" id="dropzoneHint">
+                <strong>Drop an image</strong>
+                <span>or tap to choose · PNG / JPG / WEBP</span>
+              </div>
+            </label>
+          </div>
+
+          <div class="card">
+            <h2>Settings</h2>
+
+            <label class="field">
+              <span>Base model</span>
+              <select id="baseModelSelect"></select>
+            </label>
+
+            <label class="field">
+              <span>Checkpoint</span>
+              <select id="checkpointSelect"></select>
+            </label>
+
+            <label class="field">
+              <span>Positive prompt</span>
+              <textarea id="positive" rows="2" placeholder="wearing a red silk shirt, photorealistic, detailed fabric"></textarea>
+            </label>
+
+            <label class="field">
+              <span>Negative prompt</span>
+              <textarea id="negative" rows="2" placeholder="blurry, low quality, deformed, extra limbs, watermark"></textarea>
+            </label>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Denoise <output id="denoiseOut"></output></span>
+                <input type="range" id="denoise" min="0" max="1" step="0.01" value="0.9" />
+              </label>
+              <label class="field">
+                <span>Steps <output id="stepsOut"></output></span>
+                <input type="range" id="steps" min="1" max="80" step="1" value="28" />
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>CFG <output id="cfgOut"></output></span>
+                <input type="range" id="cfg" min="1" max="20" step="0.5" value="7" />
+              </label>
+              <label class="field">
+                <span>Max size</span>
+                <input type="number" id="maxSize" min="256" max="2048" step="64" value="768" />
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Sampler</span>
+                <select id="sampler"></select>
+              </label>
+              <label class="field">
+                <span>Scheduler</span>
+                <select id="scheduler"></select>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Seed <em class="muted">(-1 = random)</em></span>
+              <input type="number" id="seed" value="-1" step="1" />
+            </label>
+
+            <div class="toggles">
+              <label class="toggle">
+                <input type="checkbox" id="preserveFace" checked />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span>Preserve face</span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="restoreSize" checked />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span>Restore size</span>
+              </label>
+            </div>
+
+            <button class="btn btn-primary btn-run" id="runBtn" type="button" disabled>
+              <span class="spinner-mini" hidden></span> Forge image
+            </button>
+            <p class="hint" id="editHint"></p>
+          </div>
+        </div>
+
+        <!-- Right: result -->
+        <div class="edit-main">
+          <div class="card result-card">
+            <div class="result-head">
+              <h2>Result</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost" id="downloadResultBtn" type="button" hidden>Download</button>
+              </div>
+            </div>
+
+            <div class="result-stage" id="resultStage">
+              <div class="placeholder" id="resultPlaceholder">
+                <p>Your forged image will appear here.</p>
+                <p class="muted">Upload a photo, describe the change, then hit <strong>Forge image</strong>.</p>
+              </div>
+
+              <div class="loading" id="resultLoading" hidden>
+                <span class="spinner" aria-hidden="true"></span>
+                <p id="editPhase">Heating the kiln…</p>
+                <div class="progress progress-lg"><div class="progress-fill" id="editProgressFill"></div></div>
+                <p class="hint" id="editProgressText">starting…</p>
+                <button class="btn btn-ghost" id="cancelEditBtn" type="button">Cancel</button>
+              </div>
+
+              <div class="error-panel" id="resultError" hidden>
+                <p class="error-title">⚠ Forge failed</p>
+                <p id="resultErrorText"></p>
+              </div>
+
+              <div class="compare" id="compare" hidden>
+                <img class="compare-img after" id="compareAfter" alt="After (generated)" />
+                <img class="compare-img before" id="compareBefore" alt="Before (original)" />
+                <div class="compare-handle" id="compareHandle" role="slider" aria-label="Compare before and after" aria-valuemin="0" aria-valuemax="100" tabindex="0">
+                  <span class="compare-knob">⇔</span>
+                </div>
+                <span class="compare-tag before-tag" id="compareBeforeTag">Before</span>
+                <span class="compare-tag after-tag">After</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card output-meta" id="outputMeta" hidden>
+            <h3>Details</h3>
+            <dl id="outputMetaList"></dl>
+          </div>
+
+          <div class="card" id="queueCard">
+            <div class="result-head">
+              <h2>Queue &amp; recent</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost" id="refreshQueue" type="button">Refresh</button>
+                <button class="btn btn-ghost" id="interruptBtn" type="button">Interrupt</button>
+              </div>
+            </div>
+            <p class="hint" id="queueStatus">—</p>
+            <div class="history-grid" id="historyGrid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== GENERATE ===================== -->
+    <section class="panel-page" id="tab-generate" role="tabpanel" aria-label="Generate" hidden>
+      <div class="edit-layout">
+        <!-- Left: prompt + settings -->
+        <div class="edit-side">
+          <div class="card">
+            <h2>Prompt</h2>
+            <label class="field">
+              <span>Positive prompt</span>
+              <textarea id="genPrompt" rows="4" placeholder="RAW photo, portrait of a woman, natural light, 8k, detailed skin, film grain"></textarea>
+            </label>
+            <label class="field">
+              <span>Negative prompt</span>
+              <textarea id="genNegative" rows="3" placeholder="blurry, low quality, deformed, extra limbs, watermark"></textarea>
+            </label>
+          </div>
+
+          <div class="card">
+            <h2>Settings</h2>
+
+            <label class="field">
+              <span>Checkpoint</span>
+              <select id="genCheckpoint"></select>
+            </label>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Width</span>
+                <input type="number" id="genWidth" min="64" max="2048" step="8" value="768" />
+              </label>
+              <label class="field">
+                <span>Height</span>
+                <input type="number" id="genHeight" min="64" max="2048" step="8" value="768" />
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Steps <output id="genStepsOut"></output></span>
+                <input type="range" id="genSteps" min="1" max="80" step="1" value="28" />
+              </label>
+              <label class="field">
+                <span>CFG <output id="genCfgOut"></output></span>
+                <input type="range" id="genCfg" min="1" max="20" step="0.5" value="7" />
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Sampler</span>
+                <select id="genSampler"></select>
+              </label>
+              <label class="field">
+                <span>Scheduler</span>
+                <select id="genScheduler"></select>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Seed <em class="muted">(-1 = random)</em></span>
+              <input type="number" id="genSeed" value="-1" step="1" />
+            </label>
+
+            <button class="btn btn-primary btn-run" id="genRunBtn" type="button" disabled>
+              <span class="spinner-mini" hidden></span> Generate image
+            </button>
+            <p class="hint" id="genHint"></p>
+          </div>
+        </div>
+
+        <!-- Right: result -->
+        <div class="edit-main">
+          <div class="card result-card">
+            <div class="result-head">
+              <h2>Result</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost" id="genDownloadBtn" type="button" hidden>Download</button>
+              </div>
+            </div>
+
+            <div class="result-stage" id="genResultStage">
+              <div class="placeholder" id="genResultPlaceholder">
+                <p>Your generated image will appear here.</p>
+                <p class="muted">Describe what you want, then hit <strong>Generate image</strong>.</p>
+              </div>
+
+              <div class="loading" id="genResultLoading" hidden>
+                <span class="spinner" aria-hidden="true"></span>
+                <p id="genPhase">Heating the kiln…</p>
+                <div class="progress progress-lg"><div class="progress-fill" id="genProgressFill"></div></div>
+                <p class="hint" id="genProgressText">starting…</p>
+                <button class="btn btn-ghost" id="genCancelBtn" type="button">Cancel</button>
+              </div>
+
+              <div class="error-panel" id="genResultError" hidden>
+                <p class="error-title">⚠ Generation failed</p>
+                <p id="genResultErrorText"></p>
+              </div>
+
+              <div class="compare" id="genCompare" hidden>
+                <img class="compare-img after" id="genCompareAfter" alt="Generated" />
+                <div class="compare-handle" id="genCompareHandle" hidden><span class="compare-knob">⇔</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card output-meta" id="genOutputMeta" hidden>
+            <h3>Details</h3>
+            <dl id="genOutputMetaList"></dl>
+          </div>
+
+          <div class="card" id="genQueueCard">
+            <div class="result-head">
+              <h2>Queue &amp; recent</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost" id="genRefreshQueue" type="button">Refresh</button>
+                <button class="btn btn-ghost" id="genInterruptBtn" type="button">Interrupt</button>
+              </div>
+            </div>
+            <p class="hint" id="genQueueStatus">—</p>
+            <div class="history-grid" id="genHistoryGrid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== TRANSFORM ===================== -->
+    <section class="panel-page" id="tab-transform" role="tabpanel" aria-label="Transform" hidden>
+      <div class="edit-layout">
+        <!-- Left: upload + settings -->
+        <div class="edit-side">
+          <div class="card">
+            <h2>Source image</h2>
+            <label class="dropzone" id="tfDropzone" tabindex="0">
+              <input type="file" id="tfFileInput" accept="image/png,image/jpeg,image/webp,image/bmp" hidden />
+              <img id="tfInputPreview" class="dropzone-preview" alt="" hidden />
+              <div class="dropzone-hint" id="tfDropzoneHint">
+                <strong>Drop an image</strong>
+                <span>or tap to choose · PNG / JPG / WEBP</span>
+              </div>
+            </label>
+          </div>
+
+          <div class="card">
+            <h2>Transform settings</h2>
+
+            <label class="field">
+              <span>Checkpoint</span>
+              <select id="tfCheckpoint"></select>
+            </label>
+
+            <label class="field">
+              <span>Prompt</span>
+              <textarea id="tfPrompt" rows="3" placeholder="oil painting, thick brush strokes, warm light"></textarea>
+            </label>
+
+            <label class="field">
+              <span>Negative prompt</span>
+              <textarea id="tfNegative" rows="2" placeholder="blurry, low quality, deformed, watermark"></textarea>
+            </label>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Denoise strength <output id="tfDenoiseOut"></output></span>
+                <input type="range" id="tfDenoise" min="0.25" max="1" step="0.01" value="0.6" />
+              </label>
+              <label class="field">
+                <span>Steps <output id="tfStepsOut"></output></span>
+                <input type="range" id="tfSteps" min="1" max="80" step="1" value="28" />
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>CFG <output id="tfCfgOut"></output></span>
+                <input type="range" id="tfCfg" min="1" max="20" step="0.5" value="7" />
+              </label>
+              <label class="field">
+                <span>Max size</span>
+                <input type="number" id="tfMaxSize" min="256" max="2048" step="64" value="768" />
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Sampler</span>
+                <select id="tfSampler"></select>
+              </label>
+              <label class="field">
+                <span>Scheduler</span>
+                <select id="tfScheduler"></select>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Seed <em class="muted">(-1 = random)</em></span>
+              <input type="number" id="tfSeed" value="-1" step="1" />
+            </label>
+
+            <div class="toggles">
+              <label class="toggle">
+                <input type="checkbox" id="tfRestoreSize" checked />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span>Restore size</span>
+              </label>
+            </div>
+
+            <button class="btn btn-primary btn-run" id="tfRunBtn" type="button" disabled>
+              <span class="spinner-mini" hidden></span> Transform image
+            </button>
+            <p class="hint" id="tfHint"></p>
+          </div>
+        </div>
+
+        <!-- Right: result -->
+        <div class="edit-main">
+          <div class="card result-card">
+            <div class="result-head">
+              <h2>Result</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost" id="tfDownloadBtn" type="button" hidden>Download</button>
+              </div>
+            </div>
+
+            <div class="result-stage" id="tfResultStage">
+              <div class="placeholder" id="tfResultPlaceholder">
+                <p>Your transformed image will appear here.</p>
+                <p class="muted">Upload a photo, describe the style, then hit <strong>Transform image</strong>.</p>
+              </div>
+
+              <div class="loading" id="tfResultLoading" hidden>
+                <span class="spinner" aria-hidden="true"></span>
+                <p id="tfPhase">Heating the kiln…</p>
+                <div class="progress progress-lg"><div class="progress-fill" id="tfProgressFill"></div></div>
+                <p class="hint" id="tfProgressText">starting…</p>
+                <button class="btn btn-ghost" id="tfCancelBtn" type="button">Cancel</button>
+              </div>
+
+              <div class="error-panel" id="tfResultError" hidden>
+                <p class="error-title">⚠ Transform failed</p>
+                <p id="tfResultErrorText"></p>
+              </div>
+
+              <div class="compare" id="tfCompare" hidden>
+                <img class="compare-img after" id="tfCompareAfter" alt="After (transformed)" />
+                <img class="compare-img before" id="tfCompareBefore" alt="Before (original)" />
+                <div class="compare-handle" id="tfCompareHandle" role="slider" aria-label="Compare before and after" aria-valuemin="0" aria-valuemax="100" tabindex="0">
+                  <span class="compare-knob">⇔</span>
+                </div>
+                <span class="compare-tag before-tag" id="tfCompareBeforeTag">Before</span>
+                <span class="compare-tag after-tag">After</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card output-meta" id="tfOutputMeta" hidden>
+            <h3>Details</h3>
+            <dl id="tfOutputMetaList"></dl>
+          </div>
+
+          <div class="card" id="tfQueueCard">
+            <div class="result-head">
+              <h2>Queue &amp; recent</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost" id="tfRefreshQueue" type="button">Refresh</button>
+                <button class="btn btn-ghost" id="tfInterruptBtn" type="button">Interrupt</button>
+              </div>
+            </div>
+            <p class="hint" id="tfQueueStatus">—</p>
+            <div class="history-grid" id="tfHistoryGrid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== MODELS ===================== -->
+    <section class="panel-page" id="tab-models" role="tabpanel" aria-label="Models" hidden>
+      <div class="card">
+        <div class="models-head">
+          <h2>Model browser</h2>
+          <div class="provider-tabs" id="providerTabs" role="tablist" aria-label="Providers">
+            <button class="chip is-active" data-provider="all">All</button>
+            <button class="chip" data-provider="civitai">Civitai</button>
+            <button class="chip" data-provider="huggingface">HuggingFace</button>
+            <button class="chip" data-provider="modelscope">ModelScope</button>
+            <button class="chip" data-provider="github">GitHub</button>
+          </div>
+        </div>
+
+        <form class="search-row" id="searchForm">
+          <input type="search" id="searchQuery" placeholder="Search models… (e.g. realistic, pony, sdxl)" autocomplete="off" />
+          <button class="btn btn-primary" type="submit">Search</button>
+        </form>
+
+        <div class="filters">
+          <label class="field"><span>Type</span>
+            <select id="filterType">
+              <option value="">Any</option>
+              <option value="checkpoint">Checkpoint</option>
+              <option value="lora">LoRA</option>
+              <option value="vae">VAE</option>
+              <option value="controlnet">ControlNet</option>
+              <option value="embedding">Embedding</option>
+            </select>
+          </label>
+          <label class="field"><span>Base model</span>
+            <input id="filterBaseModel" placeholder="e.g. SD 1.5" />
+          </label>
+          <label class="field"><span>Sort</span>
+            <select id="filterSort">
+              <option value="downloads">Downloads</option>
+              <option value="likes">Likes</option>
+              <option value="newest">Newest</option>
+            </select>
+          </label>
+          <label class="field"><span>Per provider</span>
+            <input type="number" id="filterLimit" min="1" max="50" value="20" />
+          </label>
+          <label class="toggle toggle-inline">
+            <input type="checkbox" id="filterNsfw" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span>NSFW</span>
+          </label>
+        </div>
+        <p class="hint" id="modelsHint"></p>
+      </div>
+
+      <div class="model-grid" id="modelResults"></div>
+
+      <div class="card">
+        <div class="result-head">
+          <h2>Downloads</h2>
+        </div>
+        <div id="downloadsList" class="downloads-list"><p class="muted">No downloads yet.</p></div>
+      </div>
+
+      <div class="card">
+        <div class="result-head">
+          <h2>Installed models</h2>
+          <button class="btn btn-ghost" id="refreshInstalled" type="button">Refresh</button>
+        </div>
+        <div id="installedList" class="installed-list"><p class="muted">Loading…</p></div>
+      </div>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section class="panel-page" id="tab-settings" role="tabpanel" aria-label="Settings" hidden>
+      <div class="settings-layout">
+        <div class="card">
+          <h2>Connection</h2>
+          <label class="field">
+            <span>ComfyUI URL</span>
+            <input id="cfgComfyUrl" placeholder="http://127.0.0.1:8188" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>App port</span>
+              <input type="number" id="cfgPort" min="1" max="65535" />
+            </label>
+            <label class="toggle toggle-inline" style="align-self:end">
+              <input type="checkbox" id="cfgLan" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <span>Listen on LAN</span>
+            </label>
+          </div>
+          <p class="hint">Port / LAN changes apply after restarting PixelKiln.</p>
+
+          <div class="divider"></div>
+          <label class="field">
+            <span>ComfyUI start/restart command <em class="muted">(optional)</em></span>
+            <input id="cfgRestartCommand" placeholder="e.g. ~/restart-comfy.sh" />
+          </label>
+          <label class="toggle toggle-inline">
+            <input type="checkbox" id="cfgAllowRestart" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span>Allow PixelKiln to restart ComfyUI</span>
+          </label>
+          <button class="btn" id="restartComfyBtn" type="button">Restart ComfyUI now</button>
+        </div>
+
+        <div class="card">
+          <h2>API tokens</h2>
+          <p class="hint">Stored only in <code>config.json</code> (gitignored). Leave a field blank to keep the saved value.</p>
+          <label class="field"><span>Civitai API key <em class="muted" id="tokCivitaiState"></em></span>
+            <input type="password" id="tokCivitai" placeholder="paste to set / update" autocomplete="off" />
+          </label>
+          <label class="field"><span>HuggingFace token <em class="muted" id="tokHfState"></em></span>
+            <input type="password" id="tokHf" placeholder="paste to set / update" autocomplete="off" />
+          </label>
+          <label class="field"><span>ModelScope token <em class="muted" id="tokModelscopeState"></em></span>
+            <input type="password" id="tokModelscope" placeholder="paste to set / update" autocomplete="off" />
+          </label>
+          <label class="field"><span>GitHub token <em class="muted" id="tokGithubState"></em></span>
+            <input type="password" id="tokGithub" placeholder="paste to set / update" autocomplete="off" />
+          </label>
+        </div>
+
+        <div class="card">
+          <h2>Generation defaults</h2>
+          <div class="field-row">
+            <label class="field"><span>Denoise</span><input type="number" id="defDenoise" min="0" max="1" step="0.01" /></label>
+            <label class="field"><span>Steps</span><input type="number" id="defSteps" min="1" max="200" step="1" /></label>
+          </div>
+          <div class="field-row">
+            <label class="field"><span>CFG</span><input type="number" id="defCfg" min="1" max="30" step="0.5" /></label>
+            <label class="field"><span>Seed</span><input type="number" id="defSeed" step="1" /></label>
+          </div>
+          <label class="field"><span>Max size</span><input type="number" id="defMaxSize" min="256" max="2048" step="64" /></label>
+        </div>
+
+        <div class="card">
+          <h2>This machine</h2>
+          <dl class="specs" id="specsList"><dt>Detecting…</dt></dl>
+        </div>
+
+        <div class="card">
+          <h2>Network access</h2>
+          <dl class="specs" id="networkList"><dt>Detecting…</dt></dl>
+          <p class="hint">Open a LAN URL from your phone (same WiFi). If it won’t connect, allow the port through the OS firewall.</p>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn btn-primary" id="saveSettings" type="button">Save settings</button>
+        <span class="hint" id="settingsHint"></span>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
