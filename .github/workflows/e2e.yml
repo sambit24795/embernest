@@ -1,0 +1,99 @@
+name: E2E (real CPU install)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * 1'   # weekly, Monday 05:00 UTC
+
+jobs:
+  e2e:
+    name: e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Choose a data folder
+        shell: bash
+        run: echo "EMBERNEST_HOME=$RUNNER_TEMP/embernest-home" >> "$GITHUB_ENV"
+
+      # Required models only (no starter checkpoint). The photo-edit safety model
+      # warmup is a mandatory setup step, so it runs here too.
+      # On Linux the chat companion is added too, with the smallest mainstream
+      # model (Llama 3.2 3B, about 2 GB) to keep the download small.
+      - name: Setup (CPU)
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            node bin/embernest.js setup --yes --gpu cpu --no-starter --chat --chat-model llama32-3b
+          else
+            node bin/embernest.js setup --yes --gpu cpu --no-starter
+          fi
+
+      - name: Start in the background
+        run: node bin/embernest.js start --background
+
+      - name: Check health and status (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: |
+          # Default ports: web app 3000, ComfyUI 8188 (nothing else listens on a runner).
+          for i in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:3000/api/health && break
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:3000/api/health
+          echo
+          for i in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:3000/api/status | grep -q '"online":true' && ok=1 && break
+            sleep 2
+          done
+          [ "${ok:-}" = 1 ] || { curl -sS http://127.0.0.1:3000/api/status; echo; exit 1; }
+
+      - name: Check health and status (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $health = $null
+          for ($i = 0; $i -lt 90 -and -not $health; $i++) {
+            try { $health = Invoke-RestMethod -Uri http://127.0.0.1:3000/api/health } catch { Start-Sleep -Seconds 2 }
+          }
+          if (-not $health.ok) { throw 'health check failed' }
+          $online = $false
+          for ($i = 0; $i -lt 90 -and -not $online; $i++) {
+            try { $online = [bool](Invoke-RestMethod -Uri http://127.0.0.1:3000/api/status).online } catch { }
+            if (-not $online) { Start-Sleep -Seconds 2 }
+          }
+          if (-not $online) { throw '/api/status never reported online: true' }
+
+      # Loopback requests need no token. The script waits for llama-server to load
+      # the model (slow on a CPU runner), streams one reply and checks the SSE frames.
+      - name: Chat message (Linux)
+        if: runner.os == 'Linux'
+        timeout-minutes: 20
+        env:
+          CHAT_SMOKE_TIMEOUT_MS: '900000'
+        run: node test/e2e/chat-smoke.js http://127.0.0.1:3000
+
+      - name: Doctor
+        run: node bin/embernest.js doctor
+
+      - name: Stop
+        if: always()
+        run: node bin/embernest.js stop
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.os }}
+          path: ${{ runner.temp }}/embernest-home/logs/
+          if-no-files-found: ignore

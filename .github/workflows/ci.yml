@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Dry-run setup
+        shell: bash
+        env:
+          EMBERNEST_HOME: ${{ runner.temp }}/embernest-home
+        run: node bin/embernest.js setup --dry-run --yes --gpu cpu
+      - name: Dry-run setup with chat
+        shell: bash
+        env:
+          EMBERNEST_HOME: ${{ runner.temp }}/embernest-home-chat
+        run: node bin/embernest.js setup --dry-run --yes --gpu cpu --chat
+      - name: shellcheck install.sh
+        if: runner.os == 'Linux'
+        run: shellcheck install/install.sh
+
+  install-scripts:
+    name: install script (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pack the package
+        shell: bash
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          echo "PK_TARBALL=$RUNNER_TEMP/$(ls "$RUNNER_TEMP" | grep '^embernest-.*\.tgz$' | head -n 1)" >> "$GITHUB_ENV"
+      - name: install.sh (private Node download)
+        if: runner.os != 'Windows'
+        env:
+          EMBERNEST_HOME: ${{ runner.temp }}/pk-home
+          EMBERNEST_BIN_DIR: ${{ runner.temp }}/pk-bin
+          EMBERNEST_NO_SETUP: '1'
+          EMBERNEST_FORCE_NODE_DOWNLOAD: '1'
+        run: |
+          EMBERNEST_SOURCE="$PK_TARBALL" sh install/install.sh
+          "$EMBERNEST_BIN_DIR/embernest" --version
+      - name: install.ps1 (private Node download)
+        if: runner.os == 'Windows'
+        shell: powershell
+        env:
+          EMBERNEST_HOME: ${{ runner.temp }}\pk-home
+          EMBERNEST_BIN_DIR: ${{ runner.temp }}\pk-bin
+          EMBERNEST_NO_SETUP: '1'
+          EMBERNEST_FORCE_NODE_DOWNLOAD: '1'
+        run: |
+          $env:EMBERNEST_SOURCE = $env:PK_TARBALL
+          .\install\install.ps1
+          if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { exit $LASTEXITCODE }
+          & "$env:EMBERNEST_BIN_DIR\embernest.cmd" --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

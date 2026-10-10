@@ -1,0 +1,68 @@
+name: Bug report
+description: Something does not work as the docs say
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste tokens, `config.json`, pairing links or private file
+        names. Redact them before you submit.
+  - type: input
+    id: version
+    attributes:
+      label: Embernest version
+      description: Output of `embernest --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver
+      placeholder: e.g. NVIDIA RTX 3060 12 GB, driver 555.x, or CPU only
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `embernest doctor --json`
+      description: Run it and paste the output. Check it for tokens and personal paths first.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `embernest status --json`
+      description: Check it for tokens and personal paths first.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: The steps to reproduce, and the command or screen where it went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines (optional)
+      description: From `embernest logs` or `embernest logs engine`. Redact paths and tokens.
+      render: text

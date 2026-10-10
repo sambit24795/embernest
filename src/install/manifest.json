@@ -1,0 +1,320 @@
+{
+  "manifestVersion": 1,
+  "uv": {
+    "version": "0.12.23",
+    "urlTemplate": "https://github.com/astral-sh/uv/releases/download/{version}/{file}",
+    "assets": {
+      "linux-x64": { "file": "uv-x86_64-unknown-linux-gnu.tar.gz", "sha256": "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6" },
+      "linux-arm64": { "file": "uv-aarch64-unknown-linux-gnu.tar.gz", "sha256": "6524bd338177ed50d035d39354e12545e993bbeba2ecbddf0480c5b3a81d313f" },
+      "darwin-x64": { "file": "uv-x86_64-apple-darwin.tar.gz", "sha256": "960da44cb4b73685206ddd250b19e0a117fa41095710c1038f081f5cb613efb4" },
+      "darwin-arm64": { "file": "uv-aarch64-apple-darwin.tar.gz", "sha256": "50487ae565ccd96e499056b4674d438f4c53170202617b4c759defe0c6a1b544" },
+      "win32-x64": { "file": "uv-x86_64-pc-windows-msvc.zip", "sha256": "75d05de6762778c31ee183398de7dd15093fad0ed90b1f236d8205ea5ec00c90" },
+      "win32-arm64": { "file": "uv-aarch64-pc-windows-msvc.zip", "sha256": "13294e232ececbe709c06b74e6ced06f2a225ea5591476685362f22be56a50d5" }
+    }
+  },
+  "python": { "version": "3.12" },
+  "torch": {
+    "packages": ["torch", "torchvision", "torchaudio"],
+    "indexes": {
+      "cu130": "https://download.pytorch.org/whl/cu130",
+      "cu128": "https://download.pytorch.org/whl/cu128",
+      "cu126": "https://download.pytorch.org/whl/cu126",
+      "rocm": "https://download.pytorch.org/whl/rocm7.14",
+      "xpu": "https://download.pytorch.org/whl/xpu",
+      "cpu": "https://download.pytorch.org/whl/cpu"
+    }
+  },
+  "comfyui": {
+    "tag": "v0.39.0",
+    "urlTemplate": "https://github.com/Comfy-Org/ComfyUI/archive/refs/tags/{tag}.tar.gz",
+    "sha256": "095d95805bdf36e73bbd15d6d2ee15fa627708679a2e67b5f467db4c57e7ff0a",
+    "requiredNodes": ["CheckpointLoaderSimple", "LoraLoader", "KSampler", "VAEEncode", "VAEEncodeForInpaint",
+                      "LoadBackgroundRemovalModel", "RemoveBackground", "LoadMediaPipeFaceLandmarker",
+                      "MediaPipeFaceLandmarker", "MediaPipeFaceMask", "GrowMask", "MaskComposite", "ImageScale"]
+  },
+  "models": {
+    "required": [
+      {
+        "id": "birefnet", "folder": "background_removal", "file": "birefnet.safetensors",
+        "url": "https://huggingface.co/Comfy-Org/BiRefNet/resolve/main/background_removal/birefnet.safetensors",
+        "mirrors": [], "sha256": "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154",
+        "sizeMB": 444, "license": "MIT"
+      },
+      {
+        "id": "mediapipe-face", "folder": "detection", "file": "mediapipe_face_fp32.safetensors",
+        "url": "https://huggingface.co/Comfy-Org/mediapipe/resolve/main/detection/mediapipe_face_fp32.safetensors",
+        "mirrors": [], "sha256": "a98c4806081d40eba35102a0f6dc0000c2e1388b72cf24e691703d0605bd888a",
+        "sizeMB": 5, "license": "Apache-2.0"
+      }
+    ],
+    "starter": {
+      "sd15-inpaint": {
+        "label": "Realistic Vision 5.1 inpainting (SD 1.5, fp16)", "folder": "checkpoints",
+        "file": "Realistic_Vision_V5.1_fp16-no-ema-inpainting.safetensors",
+        "url": "https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE/resolve/main/Realistic_Vision_V5.1_fp16-no-ema-inpainting.safetensors",
+        "mirrors": [], "sha256": "dbcf026dd6498122e239b06fa83a2cecca9e3ce2a39f50bef000594bd2b28ad2",
+        "sizeMB": 2133, "license": "creativeml-openrail-m"
+      },
+      "sdxl-general": {
+        "label": "Stable Diffusion XL base 1.0", "folder": "checkpoints",
+        "file": "sd_xl_base_1.0.safetensors",
+        "url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors",
+        "mirrors": [], "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+        "sizeMB": 6938, "license": "openrail++"
+      }
+    },
+    "starterByTier": {
+      "cpu": ["sd15-inpaint"], "tiny": ["sd15-inpaint"], "low": ["sd15-inpaint"],
+      "mid": ["sd15-inpaint", "sdxl-general"], "high": ["sd15-inpaint", "sdxl-general"], "ultra": ["sd15-inpaint", "sdxl-general"]
+    }
+  },
+  "safety": {
+    "repo": "Falconsai/nsfw_image_detection",
+    "revision": "96cb0d0342c7afb80cab76ecc58b265fa44da256",
+    "threshold": 0.7,
+    "license": "Apache-2.0",
+    "sizeMB": 328
+  },
+  "llm": {
+    "server": {
+      "tag": "b11429",
+      "urlTemplate": "https://github.com/ggml-org/llama.cpp/releases/download/{tag}/{file}",
+      "assets": {
+        "linux-x64-cpu": {
+          "file": "llama-b11429-bin-ubuntu-x64.tar.gz",
+          "sha256": "f6d25dde8f51133143d1453da4fd5f73b145127177612a283bf7995957af3392"
+        },
+        "linux-x64-vulkan": {
+          "file": "llama-b11429-bin-ubuntu-vulkan-x64.tar.gz",
+          "sha256": "632c4e98feba2b94407a2130e3133e0c3aefb0ea1ab41337e926d8bfafdd0b74"
+        },
+        "darwin-arm64-metal": {
+          "file": "llama-b11429-bin-macos-arm64.tar.gz",
+          "sha256": "740288ec6887be94280a5dfa25b5e23a78285cab104519e6c7e218904ee82459"
+        },
+        "darwin-x64-cpu": {
+          "file": "llama-b11429-bin-macos-x64.tar.gz",
+          "sha256": "29ac3ea02be6bd143e824973f2cc5fa74bc4094393a9eaab0ff6814f19dd8522"
+        },
+        "win32-x64-cpu": {
+          "file": "llama-b11429-bin-win-cpu-x64.zip",
+          "sha256": "1283323272b04cd07905816a597a0da810918102de958f4ff6f7bbaa70ed2efe"
+        },
+        "win32-x64-cuda": {
+          "file": "llama-b11429-bin-win-cuda-12.4-x64.zip",
+          "sha256": "dd6df685c1024e6aa55ca55ad35038692d5e284d4dc895e7a646c3245d3d14ff",
+          "extra": [
+            {
+              "file": "cudart-llama-bin-win-cuda-12.4-x64.zip",
+              "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6"
+            }
+          ]
+        },
+        "win32-x64-vulkan": {
+          "file": "llama-b11429-bin-win-vulkan-x64.zip",
+          "sha256": "1bfe78ad9168b79fa02bf67f6af9f5e17a966d824d77238517f7bef12ac73b36"
+        }
+      }
+    },
+    "models": [
+      {
+        "id": "qwen25-1b5",
+        "label": "Qwen2.5 1.5B Instruct",
+        "role": "fast",
+        "sizeClass": "1-3B",
+        "variant": "mainstream",
+        "base": "Qwen/Qwen2.5-1.5B-Instruct",
+        "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+        "file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        "url": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        "sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+        "sizeMB": 1117,
+        "license": "Apache-2.0",
+        "contextLength": 32768,
+        "toolCalling": false,
+        "toolCallingNote": "1.5B models degrade when offered tools; chat runs search and images as user-driven actions instead"
+      },
+      {
+        "id": "qwen25-1b5-abliterated",
+        "label": "Qwen2.5 1.5B Instruct abliterated (uncensored)",
+        "role": "fast",
+        "sizeClass": "1-3B",
+        "variant": "uncensored",
+        "base": "Qwen/Qwen2.5-1.5B-Instruct",
+        "repo": "mradermacher/Qwen2.5-1.5B-Instruct-abliterated-GGUF",
+        "file": "Qwen2.5-1.5B-Instruct-abliterated.Q4_K_M.gguf",
+        "url": "https://huggingface.co/mradermacher/Qwen2.5-1.5B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-1.5B-Instruct-abliterated.Q4_K_M.gguf",
+        "sha256": "59aa9f44bde5349dbe292d7024d197db605f422b8baf65f3246a59abbde4e8e9",
+        "sizeMB": 986,
+        "license": "Apache-2.0",
+        "contextLength": 32768,
+        "toolCalling": false,
+        "toolCallingNote": "1.5B models degrade when offered tools; chat runs search and images as user-driven actions instead"
+      },
+      {
+        "id": "llama32-3b",
+        "label": "Llama 3.2 3B Instruct",
+        "role": "balanced",
+        "sizeClass": "1-3B",
+        "variant": "mainstream",
+        "base": "meta-llama/Llama-3.2-3B-Instruct",
+        "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+        "file": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        "url": "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        "sha256": "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
+        "sizeMB": 2019,
+        "license": "Llama-3.2-Community",
+        "contextLength": 131072,
+        "toolCalling": true
+      },
+      {
+        "id": "llama32-3b-abliterated",
+        "label": "Llama 3.2 3B abliterated (uncensored)",
+        "role": "balanced",
+        "sizeClass": "1-3B",
+        "variant": "uncensored",
+        "base": "meta-llama/Llama-3.2-3B-Instruct",
+        "repo": "mradermacher/Llama-3.2-3B-Instruct-abliterated-GGUF",
+        "file": "Llama-3.2-3B-Instruct-abliterated.Q4_K_M.gguf",
+        "url": "https://huggingface.co/mradermacher/Llama-3.2-3B-Instruct-abliterated-GGUF/resolve/main/Llama-3.2-3B-Instruct-abliterated.Q4_K_M.gguf",
+        "sha256": "3a8ad1732ca90048bc5ecf44dcb3b789469e8a68d389ab79516853bf0d27ad34",
+        "sizeMB": 2241,
+        "license": "Llama-3.2-Community",
+        "contextLength": 131072,
+        "toolCalling": true
+      },
+      {
+        "id": "qwen3-4b",
+        "label": "Qwen3 4B Instruct 2507",
+        "role": "balanced",
+        "sizeClass": "3-4B",
+        "variant": "mainstream",
+        "base": "Qwen/Qwen3-4B-Instruct-2507",
+        "repo": "bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF",
+        "file": "Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+        "url": "https://huggingface.co/bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+        "sha256": "2fde00ce69dd4899c70d020845e2638353015bba0fdf161b3eb965f2bca4464e",
+        "sizeMB": 2497,
+        "license": "Apache-2.0",
+        "contextLength": 262144,
+        "toolCalling": true
+      },
+      {
+        "id": "qwen3-4b-abliterated",
+        "label": "Qwen3 4B Instruct 2507 abliterated (uncensored)",
+        "role": "balanced",
+        "sizeClass": "3-4B",
+        "variant": "uncensored",
+        "base": "Qwen/Qwen3-4B-Instruct-2507",
+        "repo": "mradermacher/Huihui-Qwen3-4B-Instruct-2507-abliterated-GGUF",
+        "file": "Huihui-Qwen3-4B-Instruct-2507-abliterated.Q4_K_M.gguf",
+        "url": "https://huggingface.co/mradermacher/Huihui-Qwen3-4B-Instruct-2507-abliterated-GGUF/resolve/main/Huihui-Qwen3-4B-Instruct-2507-abliterated.Q4_K_M.gguf",
+        "sha256": "b1324e2f1bd2e0610d591f54f93e38d90b187f69d1f215f4cace349eade678d7",
+        "sizeMB": 2497,
+        "license": "Apache-2.0",
+        "contextLength": 262144,
+        "toolCalling": true
+      },
+      {
+        "id": "qwen25-7b",
+        "label": "Qwen2.5 7B Instruct",
+        "role": "balanced",
+        "sizeClass": "7-8B",
+        "variant": "mainstream",
+        "base": "Qwen/Qwen2.5-7B-Instruct",
+        "repo": "bartowski/Qwen2.5-7B-Instruct-GGUF",
+        "file": "Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+        "url": "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+        "sha256": "65b8fcd92af6b4fefa935c625d1ac27ea29dcb6ee14589c55a8f115ceaaa1423",
+        "sizeMB": 4683,
+        "license": "Apache-2.0",
+        "contextLength": 32768,
+        "toolCalling": true
+      },
+      {
+        "id": "qwen25-7b-abliterated",
+        "label": "Qwen2.5 7B Instruct abliterated v2 (uncensored)",
+        "role": "balanced",
+        "sizeClass": "7-8B",
+        "variant": "uncensored",
+        "base": "Qwen/Qwen2.5-7B-Instruct",
+        "repo": "mradermacher/Qwen2.5-7B-Instruct-abliterated-v2-GGUF",
+        "file": "Qwen2.5-7B-Instruct-abliterated-v2.Q4_K_M.gguf",
+        "url": "https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-abliterated-v2-GGUF/resolve/main/Qwen2.5-7B-Instruct-abliterated-v2.Q4_K_M.gguf",
+        "sha256": "f57a8677cadbf6b23d200eb233f6b099c513024da9d2527f2be7dd1c6fe48e18",
+        "sizeMB": 4683,
+        "license": "Apache-2.0",
+        "contextLength": 32768,
+        "toolCalling": true
+      },
+      {
+        "id": "qwen25-14b",
+        "label": "Qwen2.5 14B Instruct",
+        "role": "balanced",
+        "sizeClass": "12-14B",
+        "variant": "mainstream",
+        "base": "Qwen/Qwen2.5-14B-Instruct",
+        "repo": "bartowski/Qwen2.5-14B-Instruct-GGUF",
+        "file": "Qwen2.5-14B-Instruct-Q4_K_M.gguf",
+        "url": "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf",
+        "sha256": "e47ad95dad6ff848b431053b375adb5d39321290ea2c638682577dafca87c008",
+        "sizeMB": 8988,
+        "license": "Apache-2.0",
+        "contextLength": 32768,
+        "toolCalling": true
+      },
+      {
+        "id": "qwen25-14b-abliterated",
+        "label": "Qwen2.5 14B Instruct abliterated v2 (uncensored)",
+        "role": "balanced",
+        "sizeClass": "12-14B",
+        "variant": "uncensored",
+        "base": "Qwen/Qwen2.5-14B-Instruct",
+        "repo": "mradermacher/Qwen2.5-14B-Instruct-abliterated-v2-GGUF",
+        "file": "Qwen2.5-14B-Instruct-abliterated-v2.Q4_K_M.gguf",
+        "url": "https://huggingface.co/mradermacher/Qwen2.5-14B-Instruct-abliterated-v2-GGUF/resolve/main/Qwen2.5-14B-Instruct-abliterated-v2.Q4_K_M.gguf",
+        "sha256": "e9defd1e5e0fe64203e1a1becc72a607629730ec6fdcb450394b608db3cdedaf",
+        "sizeMB": 8988,
+        "license": "Apache-2.0",
+        "contextLength": 32768,
+        "toolCalling": true
+      },
+      {
+        "id": "qwen3-4b-thinking",
+        "label": "Qwen3 4B Thinking 2507",
+        "role": "think",
+        "sizeClass": "3-4B",
+        "variant": "mainstream",
+        "base": "Qwen/Qwen3-4B-Thinking-2507",
+        "repo": "bartowski/Qwen_Qwen3-4B-Thinking-2507-GGUF",
+        "file": "Qwen_Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
+        "url": "https://huggingface.co/bartowski/Qwen_Qwen3-4B-Thinking-2507-GGUF/resolve/main/Qwen_Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
+        "sha256": "64ce5838a76b4d63071289c17ed04525265a47abf51546cd747a30e41b7687fa",
+        "sizeMB": 2497,
+        "license": "Apache-2.0",
+        "contextLength": 262144,
+        "toolCalling": true,
+        "thinking": true,
+        "thinkFormat": "<think>"
+      },
+      {
+        "id": "qwen3-4b-thinking-abliterated",
+        "label": "Qwen3 4B Thinking 2507 abliterated (uncensored)",
+        "role": "think",
+        "sizeClass": "3-4B",
+        "variant": "uncensored",
+        "base": "Qwen/Qwen3-4B-Thinking-2507",
+        "repo": "mradermacher/Huihui-Qwen3-4B-Thinking-2507-abliterated-GGUF",
+        "file": "Huihui-Qwen3-4B-Thinking-2507-abliterated.Q4_K_M.gguf",
+        "url": "https://huggingface.co/mradermacher/Huihui-Qwen3-4B-Thinking-2507-abliterated-GGUF/resolve/main/Huihui-Qwen3-4B-Thinking-2507-abliterated.Q4_K_M.gguf",
+        "sha256": "d7279ff85781e9c79c8ff18f3072fc7a5e08090162c8ffe6eeaf43a8f888c58c",
+        "sizeMB": 2497,
+        "license": "Apache-2.0",
+        "contextLength": 262144,
+        "toolCalling": true,
+        "thinking": true,
+        "thinkFormat": "<think>"
+      }
+    ]
+  }
+}

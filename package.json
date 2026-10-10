@@ -1,0 +1,58 @@
+{
+  "name": "embernest",
+  "version": "0.2.0",
+  "description": "Private local AI studio: image generation and editing plus a chat companion, installed with one command.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sambit24795/embernest.git"
+  },
+  "homepage": "https://github.com/sambit24795/embernest#readme",
+  "bugs": {
+    "url": "https://github.com/sambit24795/embernest/issues"
+  },
+  "keywords": [
+    "comfyui",
+    "stable-diffusion",
+    "local-ai",
+    "llama.cpp",
+    "image-generation",
+    "chat",
+    "companion",
+    "cli",
+    "self-hosted"
+  ],
+  "author": "Sambit Nayak",
+  "license": "MIT",
+  "bin": {
+    "embernest": "bin/embernest.js",
+    "pixelkiln": "bin/embernest.js"
+  },
+  "main": "src/cli/index.js",
+  "files": [
+    "bin",
+    "src",
+    "python",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "start": "node bin/embernest.js start"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "express": "^5.2.1",
+    "multer": "^2.4.0",
+    "picocolors": "^1.1.1",
+    "qrcode-terminal": "^0.12.0",
+    "systeminformation": "^5.33.15",
+    "tar": "^7.5.22",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "ws": "^8.22.0"
+  }
+}

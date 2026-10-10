@@ -1,0 +1,87 @@
+/* Model guide: welcome screen, suggestions, explainer sheet, Create hints, LoRA picker.
+   Uses design tokens only (no raw colours). */
+
+/* ---------- field label with an info button ---------- */
+.field-label { display: flex; align-items: center; gap: var(--space-2); }
+.field-label label { font-size: var(--fs-sm); font-weight: 500; color: var(--text-2); }
+.info-btn {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 22px; height: 22px; padding: 0; border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong); background: transparent; color: var(--text-muted);
+  font: italic 700 var(--fs-xs)/1 var(--font); font-family: Georgia, 'Times New Roman', serif; cursor: pointer;
+  position: relative;
+}
+/* 44px tap area without changing the visual size */
+.info-btn::after { content: ''; position: absolute; inset: -11px; }
+.info-btn:hover { color: var(--text); border-color: var(--accent-border); background: var(--accent-soft); }
+.info-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- explainer sheet ---------- */
+.explain-sheet { max-width: 560px; }
+.scrim.is-side .explain-sheet { width: 420px; }
+.explain-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
+.explain-head h2 { margin: 0; font-size: var(--fs-lg); }
+.explain-sheet p { color: var(--text-2); margin: 0 0 var(--space-3); }
+.explain-sheet p:last-child { margin-bottom: 0; }
+
+/* ---------- Create hint ---------- */
+.guide-hint { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
+.guide-hint p { margin: 0; }
+.guide-hint-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* ---------- LoRA picker extras ---------- */
+.lora-guide { margin: 0 0 var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
+.lora-guide.is-empty .lora-notes { display: none; }
+.lora-notes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--fs-sm); color: var(--text-muted); }
+.lora-notes a { color: var(--accent-ink); }
+.trigger-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.trigger-chips[hidden] { display: none; }
+.trigger-label { font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* ---------- Models: suggested ---------- */
+.suggest-section { margin-bottom: var(--space-8); scroll-margin-top: 72px; }
+.suggest-section > .muted { margin: 0 0 var(--space-3); }
+#goalChips { flex-wrap: wrap; }
+#goalChips .chip { white-space: normal; text-align: left; min-height: 36px; padding-top: var(--space-1); padding-bottom: var(--space-1); }
+.suggest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }
+.suggest-grid > .empty { grid-column: 1 / -1; }
+.suggest-card { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; margin: 0; }
+.suggest-card + .suggest-card { margin-top: 0; }
+.suggest-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.suggest-type { display: inline-flex; align-items: center; gap: var(--space-1); }
+.suggest-top .badge { white-space: nowrap; }
+.suggest-title { margin: 0; font-size: var(--fs-md); overflow-wrap: anywhere; }
+.suggest-what { margin: 0; color: var(--text-2); font-size: var(--fs-sm); }
+.suggest-how summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); list-style: none; cursor: pointer; font-size: var(--fs-sm); color: var(--accent-ink); min-height: 36px; }
+.suggest-how p { margin: var(--space-2) 0 0; font-size: var(--fs-sm); color: var(--text-muted); overflow-wrap: anywhere; }
+.suggest-license { white-space: normal; }
+.suggest-note { margin: 0; font-size: var(--fs-xs); color: var(--warning); }
+.suggest-card .model-actions { margin-top: auto; }
+.learn-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-4); }
+.search-section { margin-top: var(--space-8); }
+
+/* ---------- search card additions ---------- */
+.model-what { margin: 0; font-size: var(--fs-xs); color: var(--text-2); }
+.dl-warn { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); font-size: var(--fs-sm); }
+.dl-warn { border-color: var(--warning); background: var(--warning-soft); }
+.dl-warn[hidden] { display: none; }
+.dl-warn p { margin: 0; }
+.installed-pills { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); margin-left: var(--space-2); vertical-align: middle; }
+
+/* ---------- welcome screen ---------- */
+.welcome {
+  position: fixed; inset: 0; z-index: 60; overflow-y: auto; background: var(--bg);
+  padding: var(--space-6) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
+}
+.welcome[hidden] { display: none; }
+.welcome-inner { max-width: 960px; margin: 0 auto; }
+.welcome .pair-brand { margin-bottom: var(--space-4); }
+.welcome h1 { margin: 0 0 var(--space-3); }
+.welcome p { max-width: 62ch; color: var(--text-2); }
+.welcome-grid { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.welcome-foot { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-6); }
+body.has-welcome { overflow: hidden; }
+@media (max-width: 480px) {
+  .welcome-grid, .suggest-grid { grid-template-columns: minmax(0, 1fr); }
+  .welcome-foot .btn { flex: 1; }
+}

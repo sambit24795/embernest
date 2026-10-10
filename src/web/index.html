@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Embernest — private AI studio</title>
+  <meta name="description" content="Local ComfyUI front-end for image editing and model browsing." />
+  <script src="/js/theme.js"></script>
+  <link rel="stylesheet" href="/css/tokens.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/screens.css" />
+  <link rel="stylesheet" href="/css/chat.css" />
+  <link rel="stylesheet" href="/css/guide.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#0d0f12" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23ff7a18' d='M24 3c3 6 9 8 9 16a9 9 0 0 1-18 0c0-4 2-6 4-9 1 2 2 3 4 3-1-4-1-7 1-10z'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="app-shell">
+  <!-- ===================== Sidebar (desktop) / top bar + bottom nav (phone) ===================== -->
+  <header class="sidebar">
+    <a class="brand" href="#tab=chat" aria-label="Embernest home">
+      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="currentColor" style="color: var(--accent)" d="M24 3c3 6 9 8 9 16a9 9 0 0 1-18 0c0-4 2-6 4-9 1 2 2 3 4 3-1-4-1-7 1-10z" />
+        <rect x="9" y="38" width="6" height="6" rx="1" fill="var(--accent)" opacity="0.55" />
+        <rect x="21" y="38" width="6" height="6" rx="1" fill="var(--accent)" opacity="0.8" />
+        <rect x="33" y="38" width="6" height="6" rx="1" fill="var(--accent)" />
+      </svg>
+      <span class="wordmark">Ember<span class="wordmark-accent">nest</span></span>
+    </a>
+    <nav class="nav" aria-label="Main sections">
+      <a class="nav-item" href="#tab=chat" data-nav="chat">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z"/></svg><span>Chat</span></a>
+      <a class="nav-item" href="#tab=create" data-nav="create">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg><span>Create</span></a>
+      <a class="nav-item" href="#tab=models" data-nav="models">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><span>Models</span></a>
+      <a class="nav-item" href="#tab=settings" data-nav="settings">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Settings</span></a>
+    </nav>
+    <button class="status-pill" id="statusPill" type="button" title="ComfyUI status — click to refresh">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Checking ComfyUI…</span>
+    </button>
+  </header>
+
+  <div class="app-main">
+  <main>
+    <!-- Create modes: Generate · Transform · Edit (shown only on the Create tab) -->
+    <nav class="segmented create-modes" id="createModes" aria-label="Create mode" hidden>
+      <a href="#tab=create&amp;mode=generate" data-mode="generate">Generate</a>
+      <a href="#tab=create&amp;mode=transform" data-mode="transform">Transform</a>
+      <a href="#tab=create&amp;mode=edit" data-mode="edit">Edit</a>
+    </nav>
+
+    <!-- ===================== CHAT ===================== -->
+    <section class="panel-page" id="tab-chat" role="tabpanel" aria-label="Chat" hidden>
+      <div class="note note-danger chat-error" id="chatError" role="alert" hidden></div>
+
+      <div class="empty chat-setup" id="chatSetup" hidden>
+        <svg class="empty-art" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z"/></svg>
+        <h3>Chat isn’t set up</h3>
+        <p>On your computer run <code>embernest chat enable</code>, then reopen this tab.</p>
+      </div>
+
+      <div class="chat-app" id="chatMain" data-pane="list" hidden>
+        <aside class="chat-list" id="chatList" aria-label="Saved conversations">
+          <div class="chat-list-head">
+            <h2>Chats</h2>
+            <button class="btn btn-primary btn-sm" id="chatNewBtn" type="button">+ New chat</button>
+          </div>
+          <input type="search" id="chatFilter" class="chat-filter" placeholder="Search chats" aria-label="Search chats" autocomplete="off" />
+          <ul class="chat-items" id="chatItems"></ul>
+          <div class="empty empty-sm" id="chatListEmpty" hidden>
+            <h3>No chats yet</h3>
+            <p>Start one with a persona or the plain assistant.</p>
+          </div>
+        </aside>
+
+        <div class="chat-pane">
+          <header class="chat-head">
+            <button class="btn btn-ghost btn-icon chat-back" id="chatBack" type="button" aria-label="Back to chats">
+              <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+            </button>
+            <button class="chat-who" id="chatTitle" type="button" disabled>
+              <span class="chat-who-text"><strong>New chat</strong></span>
+            </button>
+            <div class="menu-wrap">
+              <button class="btn btn-ghost btn-icon" id="chatMenuBtn" type="button" aria-label="Chat options" aria-haspopup="menu" aria-expanded="false">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/></svg>
+              </button>
+              <div class="menu" id="chatMenu" role="menu" hidden>
+                <button class="menu-item" id="chatIncognito" type="button" role="menuitemcheckbox" aria-checked="false">
+                  <span>Incognito</span><span class="menu-state" id="chatIncognitoState">Off</span>
+                </button>
+                <button class="menu-item" id="chatPersonaBtn" type="button" role="menuitem">Persona &amp; memories</button>
+                <button class="menu-item" id="chatRenameBtn" type="button" role="menuitem">Rename</button>
+                <button class="menu-item menu-item-danger" id="chatDeleteBtn" type="button" role="menuitem">Delete</button>
+              </div>
+            </div>
+          </header>
+          <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
+          <form class="composer" id="chatForm">
+            <div class="composer-hint" id="chatSearchHint" role="status" hidden>
+              <span class="composer-hint-text" id="chatSearchHintText"></span>
+              <button class="btn btn-ghost btn-icon composer-hint-close" id="chatSearchHintClose" type="button" aria-label="Dismiss tip">×</button>
+            </div>
+            <div class="composer-chips">
+              <button class="chip" id="chatSearch" type="button" aria-pressed="false">🔎 Search</button>
+              <button class="chip" id="chatImage" type="button" aria-pressed="false">🎨 Image</button>
+              <button class="chip" id="chatThink" type="button" aria-pressed="false" hidden>🧠 Think harder</button>
+            </div>
+            <div class="composer-row">
+              <textarea id="chatInput" rows="1" placeholder="Write a message…" aria-label="Message" enterkeyhint="send"></textarea>
+              <button class="btn btn-primary btn-icon composer-send" id="chatSend" type="submit" aria-label="Send">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+              </button>
+              <button class="btn btn-icon composer-stop" id="chatStop" type="button" aria-label="Stop" hidden>
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="persona-picker" id="personaPicker" hidden>
+        <div class="page-head picker-head">
+          <button class="btn btn-ghost btn-icon" id="pickerBackBtn" type="button" aria-label="Back">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <div>
+            <h1>Start a chat</h1>
+            <p class="help">Pick who you want to talk to.</p>
+          </div>
+        </div>
+        <div class="persona-grid" id="personaGrid"></div>
+        <button class="btn" id="newPersonaBtn" type="button">+ New persona</button>
+      </div>
+
+      <div class="scrim is-side" id="personaScrim" hidden>
+        <section class="sheet persona-sheet" id="personaEditor" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+          <header class="sheet-head">
+            <h2 id="editorTitle">New persona</h2>
+            <button class="btn btn-ghost btn-icon" id="editorCancelBtn" type="button" aria-label="Close">
+              <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </header>
+          <div class="sheet-body">
+            <section class="sheet-section" aria-labelledby="secBasics">
+              <h3 id="secBasics">Basics</h3>
+              <label class="field"><span>Name</span><input type="text" id="pName" maxlength="40" /></label>
+              <label class="field"><span>Tagline</span><input type="text" id="pTagline" maxlength="4000" /></label>
+            </section>
+            <section class="sheet-section" aria-labelledby="secAvatar">
+              <h3 id="secAvatar">Avatar</h3>
+              <div class="persona-avatar-row">
+                <div id="editorAvatarPreview"></div>
+                <label class="btn btn-sm persona-upload">
+                  Upload image
+                  <input type="file" id="editorAvatarFile" accept="image/png,image/jpeg,image/webp" hidden />
+                </label>
+              </div>
+              <div class="persona-emojis" id="editorEmojis"></div>
+            </section>
+            <section class="sheet-section" aria-labelledby="secStyle">
+              <h3 id="secStyle">Personality &amp; style</h3>
+              <label class="field"><span>Personality</span><textarea id="pPersonality" rows="4" maxlength="4000"></textarea></label>
+              <label class="field"><span>How they talk</span><textarea id="pStyle" rows="3" maxlength="4000"></textarea></label>
+              <label class="field"><span>Greeting (optional)</span><textarea id="pGreeting" rows="2" maxlength="4000"></textarea></label>
+            </section>
+            <section class="sheet-section" aria-labelledby="secExamples">
+              <div class="sheet-section-head">
+                <h3 id="secExamples">Examples</h3>
+                <button class="btn btn-ghost btn-sm" id="addExampleBtn" type="button">+ Add</button>
+              </div>
+              <p class="help">Example dialogue, up to 6.</p>
+              <div id="pExamples"></div>
+            </section>
+            <section class="sheet-section memory" id="memorySection" aria-labelledby="secMemories" hidden>
+              <div class="sheet-section-head">
+                <h3 id="secMemories">Memories</h3>
+                <button class="btn btn-ghost btn-sm" id="memAddBtn" type="button">+ Add</button>
+              </div>
+              <div class="memory-add" id="memoryAdd" hidden>
+                <input type="text" id="memoryText" maxlength="300" placeholder="A fact to remember about you" aria-label="New memory" />
+                <label class="toggle toggle-inline memory-pin"><input type="checkbox" id="memoryPin" /><span class="toggle-track"><span class="toggle-thumb"></span></span>Pinned</label>
+                <button class="btn btn-sm" id="memorySaveBtn" type="button">Save memory</button>
+              </div>
+              <ul class="memory-list" id="memoryList"></ul>
+              <p class="help memory-empty" id="memoryEmpty" hidden>Nothing remembered yet.</p>
+              <div class="note note-danger danger-zone" id="memoryForget" hidden>
+                <p>Forget everything this persona remembers about you. This cannot be undone.</p>
+                <button class="btn btn-danger btn-sm" id="memoryForgetBtn" type="button">Forget everything</button>
+              </div>
+            </section>
+            <div class="note note-danger" id="editorError" role="alert" hidden></div>
+          </div>
+          <footer class="sheet-foot">
+            <button class="btn btn-danger" id="editorDeleteBtn" type="button" hidden>Delete persona</button>
+            <button class="btn btn-primary" id="editorSaveBtn" type="button">Save</button>
+          </footer>
+        </section>
+      </div>
+    </section>
+
+    <!-- ===================== CREATE: GENERATE ===================== -->
+    <section class="panel-page" id="tab-generate" role="tabpanel" aria-label="Generate">
+      <div class="create-layout">
+        <div class="create-form">          <div class="card create-card">
+            <label class="field prompt-field">
+              <span>Describe the image</span>
+              <textarea id="genPrompt" rows="4" placeholder="RAW photo, portrait of a woman, natural light, 8k, detailed skin, film grain"></textarea>
+            </label>
+            <div class="field">
+              <div class="field-label"><label for="genCheckpoint">Checkpoint</label><button class="info-btn" type="button" data-explain="checkpoint" aria-label="What is a checkpoint?" title="What is a checkpoint?">i</button></div>
+              <select id="genCheckpoint"></select>
+            </div>
+            <div class="field-row">
+              <label class="field">
+                <span>Width</span>
+                <input type="number" id="genWidth" min="64" max="2048" step="8" value="768" inputmode="numeric" />
+              </label>
+              <label class="field">
+                <span>Height</span>
+                <input type="number" id="genHeight" min="64" max="2048" step="8" value="768" inputmode="numeric" />
+              </label>
+            </div>
+            <div class="field-row field-row-lora">
+              <div class="field">
+                <div class="field-label"><label for="genLora">LoRA <em class="muted">(optional)</em></label><button class="info-btn" type="button" data-explain="lora" aria-label="What is a LoRA?" title="What is a LoRA?">i</button></div>
+                <select id="genLora"><option value="">None</option></select>
+              </div>
+              <label class="field">
+                <span>Strength <output id="genLoraStrengthOut">1.00</output></span>
+                <input type="range" id="genLoraStrength" min="0" max="2" step="0.05" value="1" />
+              </label>
+            </div>
+
+            <details class="advanced">
+              <summary>Advanced settings</summary>
+              <div class="advanced-body">
+                <label class="field">
+                  <span>Negative prompt</span>
+                  <textarea id="genNegative" rows="2" placeholder="blurry, low quality, deformed, extra limbs, watermark"></textarea>
+                </label>
+                <div class="field-row">
+                  <label class="field">
+                    <span>Steps <output id="genStepsOut"></output></span>
+                    <input type="range" id="genSteps" min="1" max="80" step="1" value="28" />
+                  </label>
+                  <label class="field">
+                    <span>CFG <output id="genCfgOut"></output></span>
+                    <input type="range" id="genCfg" min="1" max="20" step="0.5" value="7" />
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label class="field">
+                    <span>Sampler</span>
+                    <select id="genSampler"></select>
+                  </label>
+                  <label class="field">
+                    <span>Scheduler</span>
+                    <select id="genScheduler"></select>
+                  </label>
+                </div>
+                <label class="field">
+                  <span>Seed <em class="muted">(-1 = random)</em></span>
+                  <input type="number" id="genSeed" value="-1" step="1" inputmode="numeric" />
+                </label>
+              </div>
+            </details>
+          </div>
+
+          <div class="run-bar">
+            <button class="btn btn-primary btn-run" id="genRunBtn" type="button" disabled>
+              <span class="spinner-mini" hidden></span> Generate image
+            </button>
+            <p class="run-hint" id="genHint"></p>
+          </div>
+        </div>
+
+        <div class="create-out">
+          <div class="card result-card">
+            <div class="result-head">
+              <h2>Result</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost btn-sm" id="genReuseBtn" type="button" hidden>Reuse settings</button>
+                <button class="btn btn-ghost btn-sm" id="genDownloadBtn" type="button" hidden>Download</button>
+                <button class="btn btn-ghost btn-sm btn-danger-text" id="genDeleteBtn" type="button" hidden>Delete</button>
+              </div>
+            </div>
+
+            <div class="result-stage">
+              <div class="empty" id="genResultPlaceholder">
+                <svg class="empty-art" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
+                <h3>Your image will appear here</h3>
+                <p>Describe what you want, then press Generate.</p>
+              </div>
+
+              <div class="loading" id="genResultLoading" hidden>
+                <p class="loading-phase" id="genPhase">Heating the kiln&hellip;</p>
+                <div class="progress"><div class="progress-fill" id="genProgressFill"></div></div>
+                <div class="loading-row">
+                  <span class="hint" id="genProgressText">starting&hellip;</span>
+                  <button class="btn btn-ghost btn-sm" id="genCancelBtn" type="button">Cancel</button>
+                </div>
+              </div>
+
+              <div class="note note-danger error-panel" id="genResultError" hidden>
+                <strong class="error-title">Generation failed</strong>
+                <p id="genResultErrorText"></p>
+              </div>
+              <div class="compare" id="genCompare" hidden>
+                <img class="compare-img after" id="genCompareAfter" alt="Generated" />
+                <div class="compare-handle" id="genCompareHandle" hidden><span class="compare-knob">&#8660;</span></div>
+              </div>
+            </div>
+            <details class="output-meta" id="genOutputMeta" hidden>
+              <summary>Details</summary>
+              <dl class="specs" id="genOutputMetaList"></dl>
+            </details>
+          </div>
+
+          <div class="card recent-card">
+            <div class="result-head">
+              <h2>Recent</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost btn-sm" id="genRefreshQueue" type="button">Refresh</button>
+                <button class="btn btn-ghost btn-sm" id="genInterruptBtn" type="button">Interrupt</button>
+              </div>
+            </div>
+            <p class="hint queue-status" id="genQueueStatus">&mdash;</p>
+            <div class="history-grid" id="genHistoryGrid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== CREATE: TRANSFORM ===================== -->
+    <section class="panel-page" id="tab-transform" role="tabpanel" aria-label="Transform" hidden>
+      <div class="create-layout">
+        <div class="create-form">          <div class="card create-card">
+            <label class="dropzone" id="tfDropzone" tabindex="0">
+              <input type="file" id="tfFileInput" accept="image/png,image/jpeg,image/webp,image/bmp" hidden />
+              <img id="tfInputPreview" class="dropzone-preview" alt="" hidden />
+              <div class="dropzone-hint" id="tfDropzoneHint">
+                <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
+                <strong>Drop an image</strong>
+                <span>or tap to choose &middot; PNG / JPG / WEBP</span>
+              </div>
+            </label>
+            <p class="note-quiet">Only edit photos of people who agreed to it. Nude edits of uploaded photos are blocked.</p>
+          </div>
+          <div class="card create-card">
+            <label class="field prompt-field">
+              <span>Describe the new style</span>
+              <textarea id="tfPrompt" rows="4" placeholder="oil painting, thick brush strokes, warm light"></textarea>
+            </label>
+            <div class="field">
+              <div class="field-label"><label for="tfCheckpoint">Checkpoint</label><button class="info-btn" type="button" data-explain="checkpoint" aria-label="What is a checkpoint?" title="What is a checkpoint?">i</button></div>
+              <select id="tfCheckpoint"></select>
+            </div>
+            <label class="field">
+              <span>Max size <em class="muted">(px, sampled then restored)</em></span>
+              <input type="number" id="tfMaxSize" min="256" max="2048" step="64" value="768" inputmode="numeric" />
+            </label>
+            <div class="field-row field-row-lora">
+              <div class="field">
+                <div class="field-label"><label for="tfLora">LoRA <em class="muted">(optional)</em></label><button class="info-btn" type="button" data-explain="lora" aria-label="What is a LoRA?" title="What is a LoRA?">i</button></div>
+                <select id="tfLora"><option value="">None</option></select>
+              </div>
+              <label class="field">
+                <span>Strength <output id="tfLoraStrengthOut">1.00</output></span>
+                <input type="range" id="tfLoraStrength" min="0" max="2" step="0.05" value="1" />
+              </label>
+            </div>
+
+            <details class="advanced">
+              <summary>Advanced settings</summary>
+              <div class="advanced-body">
+                <label class="field">
+                  <span>Negative prompt</span>
+                  <textarea id="tfNegative" rows="2" placeholder="blurry, low quality, deformed, extra limbs, watermark"></textarea>
+                </label>
+                <label class="field">
+                  <span>Denoise strength <output id="tfDenoiseOut"></output></span>
+                  <input type="range" id="tfDenoise" min="0.25" max="1" step="0.01" value="0.6" />
+                </label>
+                <div class="field-row">
+                  <label class="field">
+                    <span>Steps <output id="tfStepsOut"></output></span>
+                    <input type="range" id="tfSteps" min="1" max="80" step="1" value="28" />
+                  </label>
+                  <label class="field">
+                    <span>CFG <output id="tfCfgOut"></output></span>
+                    <input type="range" id="tfCfg" min="1" max="20" step="0.5" value="7" />
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label class="field">
+                    <span>Sampler</span>
+                    <select id="tfSampler"></select>
+                  </label>
+                  <label class="field">
+                    <span>Scheduler</span>
+                    <select id="tfScheduler"></select>
+                  </label>
+                </div>
+                <label class="field">
+                  <span>Seed <em class="muted">(-1 = random)</em></span>
+                  <input type="number" id="tfSeed" value="-1" step="1" inputmode="numeric" />
+                </label>
+                <div class="toggles">
+                <label class="toggle">
+                  <input type="checkbox" id="tfRestoreSize" checked />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  <span>Restore size</span>
+                </label>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div class="run-bar">
+            <button class="btn btn-primary btn-run" id="tfRunBtn" type="button" disabled>
+              <span class="spinner-mini" hidden></span> Transform image
+            </button>
+            <p class="run-hint" id="tfHint"></p>
+          </div>
+        </div>
+
+        <div class="create-out">
+          <div class="card result-card">
+            <div class="result-head">
+              <h2>Result</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost btn-sm" id="tfReuseBtn" type="button" hidden>Reuse settings</button>
+                <button class="btn btn-ghost btn-sm" id="tfDownloadBtn" type="button" hidden>Download</button>
+                <button class="btn btn-ghost btn-sm btn-danger-text" id="tfDeleteBtn" type="button" hidden>Delete</button>
+              </div>
+            </div>
+
+            <div class="result-stage">
+              <div class="empty" id="tfResultPlaceholder">
+                <svg class="empty-art" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
+                <h3>Your transformed image will appear here</h3>
+                <p>Add a photo, describe the style, then press Transform.</p>
+              </div>
+
+              <div class="loading" id="tfResultLoading" hidden>
+                <p class="loading-phase" id="tfPhase">Heating the kiln&hellip;</p>
+                <div class="progress"><div class="progress-fill" id="tfProgressFill"></div></div>
+                <div class="loading-row">
+                  <span class="hint" id="tfProgressText">starting&hellip;</span>
+                  <button class="btn btn-ghost btn-sm" id="tfCancelBtn" type="button">Cancel</button>
+                </div>
+              </div>
+
+              <div class="note note-danger error-panel" id="tfResultError" hidden>
+                <strong class="error-title">Transform failed</strong>
+                <p id="tfResultErrorText"></p>
+              </div>
+              <div class="compare" id="tfCompare" hidden>
+                <img class="compare-img after" id="tfCompareAfter" alt="After" />
+                <img class="compare-img before" id="tfCompareBefore" alt="Before (original)" />
+                <div class="compare-handle" id="tfCompareHandle" role="slider" aria-label="Compare before and after" aria-valuemin="0" aria-valuemax="100" tabindex="0">
+                  <span class="compare-knob">&#8660;</span>
+                </div>
+                <span class="compare-tag before-tag" id="tfCompareBeforeTag">Before</span>
+                <span class="compare-tag after-tag">After</span>
+              </div>
+            </div>
+            <details class="output-meta" id="tfOutputMeta" hidden>
+              <summary>Details</summary>
+              <dl class="specs" id="tfOutputMetaList"></dl>
+            </details>
+          </div>
+
+          <div class="card recent-card">
+            <div class="result-head">
+              <h2>Recent</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost btn-sm" id="tfRefreshQueue" type="button">Refresh</button>
+                <button class="btn btn-ghost btn-sm" id="tfInterruptBtn" type="button">Interrupt</button>
+              </div>
+            </div>
+            <p class="hint queue-status" id="tfQueueStatus">&mdash;</p>
+            <div class="history-grid" id="tfHistoryGrid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== CREATE: EDIT ===================== -->
+    <section class="panel-page" id="tab-edit" role="tabpanel" aria-label="Edit" hidden>
+      <div class="create-layout">
+        <div class="create-form">          <div class="rec-chip" id="editRecBanner" hidden>
+            <span class="rec-icon" aria-hidden="true">&#9889;</span>
+            <p id="editRecText"></p>
+            <button class="btn btn-ghost btn-sm" id="resetRecommendedBtn" type="button">Reset</button>
+          </div>
+          <div class="card create-card">
+            <label class="dropzone" id="dropzone" tabindex="0">
+              <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/bmp" hidden />
+              <img id="inputPreview" class="dropzone-preview" alt="" hidden />
+              <div class="dropzone-hint" id="dropzoneHint">
+                <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
+                <strong>Drop an image</strong>
+                <span>or tap to choose &middot; PNG / JPG / WEBP</span>
+              </div>
+            </label>
+            <p class="note-quiet">Only edit photos of people who agreed to it. Nude edits of uploaded photos are blocked.</p>
+          </div>
+          <div class="card create-card">
+            <label class="field prompt-field">
+              <span>What should change?</span>
+              <textarea id="positive" rows="4" placeholder="wearing a red silk shirt, photorealistic, detailed fabric"></textarea>
+            </label>
+            <label class="field">
+              <span>Base model</span>
+              <select id="baseModelSelect"></select>
+            </label>
+            <div class="field">
+              <div class="field-label"><label for="checkpointSelect">Checkpoint</label><button class="info-btn" type="button" data-explain="checkpoint" aria-label="What is a checkpoint?" title="What is a checkpoint?">i</button></div>
+              <select id="checkpointSelect"></select>
+            </div>
+            <label class="field">
+              <span>Max size <em class="muted">(px, sampled then restored)</em></span>
+              <input type="number" id="maxSize" min="256" max="2048" step="64" value="768" inputmode="numeric" />
+            </label>
+            <div class="field-row field-row-lora">
+              <div class="field">
+                <div class="field-label"><label for="lora">LoRA <em class="muted">(optional)</em></label><button class="info-btn" type="button" data-explain="lora" aria-label="What is a LoRA?" title="What is a LoRA?">i</button></div>
+                <select id="lora"><option value="">None</option></select>
+              </div>
+              <label class="field">
+                <span>Strength <output id="loraStrengthOut">1.00</output></span>
+                <input type="range" id="loraStrength" min="0" max="2" step="0.05" value="1" />
+              </label>
+            </div>
+
+            <details class="advanced">
+              <summary>Advanced settings</summary>
+              <div class="advanced-body">
+                <label class="field">
+                  <span>Negative prompt</span>
+                  <textarea id="negative" rows="2" placeholder="blurry, low quality, deformed, extra limbs, watermark"></textarea>
+                </label>
+                <label class="field">
+                  <span>Denoise <output id="denoiseOut"></output></span>
+                  <input type="range" id="denoise" min="0" max="1" step="0.01" value="0.9" />
+                </label>
+                <div class="field-row">
+                  <label class="field">
+                    <span>Steps <output id="stepsOut"></output></span>
+                    <input type="range" id="steps" min="1" max="80" step="1" value="28" />
+                  </label>
+                  <label class="field">
+                    <span>CFG <output id="cfgOut"></output></span>
+                    <input type="range" id="cfg" min="1" max="20" step="0.5" value="7" />
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label class="field">
+                    <span>Sampler</span>
+                    <select id="sampler"></select>
+                  </label>
+                  <label class="field">
+                    <span>Scheduler</span>
+                    <select id="scheduler"></select>
+                  </label>
+                </div>
+                <label class="field">
+                  <span>Seed <em class="muted">(-1 = random)</em></span>
+                  <input type="number" id="seed" value="-1" step="1" inputmode="numeric" />
+                </label>
+                <div class="toggles">
+                <label class="toggle">
+                  <input type="checkbox" id="preserveFace" checked />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  <span>Preserve face</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="restoreSize" checked />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  <span>Restore size</span>
+                </label>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div class="run-bar">
+            <button class="btn btn-primary btn-run" id="runBtn" type="button" disabled>
+              <span class="spinner-mini" hidden></span> Forge image
+            </button>
+            <p class="run-hint" id="editHint"></p>
+          </div>
+        </div>
+
+        <div class="create-out">
+          <div class="card result-card">
+            <div class="result-head">
+              <h2>Result</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost btn-sm" id="reuseEditBtn" type="button" hidden>Reuse settings</button>
+                <button class="btn btn-ghost btn-sm" id="downloadResultBtn" type="button" hidden>Download</button>
+                <button class="btn btn-ghost btn-sm btn-danger-text" id="deleteEditBtn" type="button" hidden>Delete</button>
+              </div>
+            </div>
+
+            <div class="result-stage">
+              <div class="empty" id="resultPlaceholder">
+                <svg class="empty-art" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
+                <h3>Your edit will appear here</h3>
+                <p>Add a photo, describe the change, then press Forge.</p>
+              </div>
+
+              <div class="loading" id="resultLoading" hidden>
+                <p class="loading-phase" id="editPhase">Heating the kiln&hellip;</p>
+                <div class="progress"><div class="progress-fill" id="editProgressFill"></div></div>
+                <div class="loading-row">
+                  <span class="hint" id="editProgressText">starting&hellip;</span>
+                  <button class="btn btn-ghost btn-sm" id="cancelEditBtn" type="button">Cancel</button>
+                </div>
+              </div>
+
+              <div class="note note-danger error-panel" id="resultError" hidden>
+                <strong class="error-title">Forge failed</strong>
+                <p id="resultErrorText"></p>
+              </div>
+              <div class="compare" id="compare" hidden>
+                <img class="compare-img after" id="compareAfter" alt="After" />
+                <img class="compare-img before" id="compareBefore" alt="Before (original)" />
+                <div class="compare-handle" id="compareHandle" role="slider" aria-label="Compare before and after" aria-valuemin="0" aria-valuemax="100" tabindex="0">
+                  <span class="compare-knob">&#8660;</span>
+                </div>
+                <span class="compare-tag before-tag" id="compareBeforeTag">Before</span>
+                <span class="compare-tag after-tag">After</span>
+              </div>
+            </div>
+            <details class="output-meta" id="outputMeta" hidden>
+              <summary>Details</summary>
+              <dl class="specs" id="outputMetaList"></dl>
+            </details>
+          </div>
+
+          <div class="card recent-card">
+            <div class="result-head">
+              <h2>Recent</h2>
+              <div class="result-actions">
+                <button class="btn btn-ghost btn-sm" id="refreshQueue" type="button">Refresh</button>
+                <button class="btn btn-ghost btn-sm" id="interruptBtn" type="button">Interrupt</button>
+              </div>
+            </div>
+            <p class="hint queue-status" id="queueStatus">&mdash;</p>
+            <div class="history-grid" id="historyGrid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== MODELS ===================== -->
+    <section class="panel-page" id="tab-models" role="tabpanel" aria-label="Models" hidden>
+      <header class="page-head">
+        <h1>Models</h1>
+        <p class="muted">Find checkpoints and LoRAs, download them, and manage what is installed.</p>
+      </header>
+
+      <section class="suggest-section" id="suggestSection" aria-labelledby="sugTitle">
+        <div class="section-head"><h2 id="sugTitle">Suggested for you</h2></div>
+        <p class="muted" id="suggestIntro">Looking for good starting points&hellip;</p>
+        <div class="chip-row" id="goalChips" role="group" aria-label="What do you want to do?"></div>
+        <div class="suggest-grid" id="suggestList"></div>
+        <div class="learn-row" aria-label="What do these mean?">
+          <span class="muted">What is a</span>
+          <button class="chip" type="button" data-explain="checkpoint">Checkpoint</button>
+          <button class="chip" type="button" data-explain="inpainting">Inpainting checkpoint</button>
+          <button class="chip" type="button" data-explain="lora">LoRA</button>
+          <button class="chip" type="button" data-explain="embedding">Embedding</button>
+          <button class="chip" type="button" data-explain="vae">VAE</button>
+          <button class="chip" type="button" data-explain="families">Base model</button>
+          <span class="muted">?</span>
+        </div>
+      </section>
+
+      <section class="section search-section" aria-labelledby="searchTitle">
+        <div class="section-head"><h2 id="searchTitle">Search all models</h2></div>
+      <form class="search-row" id="searchForm" role="search">
+        <input type="search" id="searchQuery" placeholder="Search models, e.g. realistic, pony, sdxl" autocomplete="off" aria-label="Search models" />
+        <button class="btn btn-primary" type="submit">Search</button>
+      </form>
+
+      <div class="filter-bar" aria-label="Filters">
+        <div class="chip-row" id="providerTabs" role="group" aria-label="Provider">
+          <button class="chip is-active" type="button" data-provider="all">All</button>
+          <button class="chip" type="button" data-provider="civitai">Civitai</button>
+          <button class="chip" type="button" data-provider="huggingface">Hugging Face</button>
+        </div>
+        <div class="chip-row" id="typeChips" role="group" aria-label="Model type">
+          <input type="hidden" id="filterType" value="" />
+          <button class="chip is-active" type="button" data-type="">Any type</button>
+          <button class="chip" type="button" data-type="checkpoint">Checkpoint</button>
+          <button class="chip" type="button" data-type="lora">LoRA</button>
+          <button class="chip" type="button" data-type="vae">VAE</button>
+          <button class="chip" type="button" data-type="controlnet">ControlNet</button>
+          <button class="chip" type="button" data-type="embedding">Embedding</button>
+        </div>
+        <div class="chip-row filter-extra">
+          <label class="chip chip-check"><input type="checkbox" id="filterNsfw" /><span>NSFW</span></label>
+          <label class="chip chip-check"><input type="checkbox" id="filterInpainting" /><span>Inpainting only</span></label>
+          <input class="filter-input" id="filterBaseModel" placeholder="Base model, e.g. SD 1.5" aria-label="Base model" />
+          <select class="filter-select" id="filterSort" aria-label="Sort by">
+            <option value="downloads">Most downloads</option>
+            <option value="likes">Most likes</option>
+            <option value="newest">Newest</option>
+          </select>
+          <label class="filter-limit"><span>Per provider</span>
+            <input type="number" id="filterLimit" min="1" max="50" value="20" inputmode="numeric" />
+          </label>
+        </div>
+      </div>
+
+      <p class="hint" id="modelsHint" aria-live="polite"></p>
+      <p class="note" id="modelsNote" hidden></p>
+
+      <div class="model-grid" id="modelResults"></div>
+      </section>
+
+      <section class="section" aria-labelledby="dlTitle">
+        <div class="section-head"><h2 id="dlTitle">Downloads</h2></div>
+        <div id="downloadsList" class="downloads-list">
+          <div class="empty empty-sm"><p>No downloads yet. Pick a model above and press Download.</p></div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="instTitle">
+        <div class="section-head">
+          <h2 id="instTitle">Installed models</h2>
+          <button class="btn btn-ghost btn-sm" id="refreshInstalled" type="button">Refresh</button>
+        </div>
+        <div id="installedList" class="installed-list"><p class="muted">Loading&hellip;</p></div>
+      </section>
+
+      <section class="section" aria-labelledby="toolsTitle">
+        <div class="section-head"><h2 id="toolsTitle">Merge tools</h2></div>
+        <div class="tools-grid">
+          <details class="card tool-card">
+            <summary>Merge checkpoints</summary>
+            <p class="help">Blend two same-base checkpoints (for example SD 1.5 + SD 1.5) into a new one.</p>
+            <div class="field-row">
+              <label class="field"><span>Checkpoint A</span>
+                <select id="mergeA"><option value="">No checkpoint</option></select>
+              </label>
+              <label class="field"><span>Checkpoint B</span>
+                <select id="mergeB"><option value="">No checkpoint</option></select>
+              </label>
+            </div>
+            <label class="field"><span>A weight <output id="mergeRatioVal">50%</output></span>
+              <input type="range" id="mergeRatio" min="0" max="1" step="0.05" value="0.5" />
+            </label>
+            <label class="field"><span>Output filename</span>
+              <input id="mergeName" value="embernest_merge" placeholder="embernest_merge" />
+            </label>
+            <button class="btn btn-primary" id="mergeBtn" type="button">Merge</button>
+            <div id="mergeStatus" class="muted merge-status"></div>
+          </details>
+
+          <details class="card tool-card">
+            <summary>Merge LoRAs</summary>
+            <p class="help">Bake two same-base LoRAs into one .safetensors LoRA (exact, rank-concatenated, no quality loss).</p>
+            <div class="field-row">
+              <label class="field"><span>LoRA A</span>
+                <select id="mergeLoraA"><option value="">No LoRA</option></select>
+              </label>
+              <label class="field"><span>LoRA B</span>
+                <select id="mergeLoraB"><option value="">No LoRA</option></select>
+              </label>
+            </div>
+            <div class="field-row">
+              <label class="field"><span>A strength <output id="mergeLoraStrengthAVal">1.00</output></span>
+                <input type="range" id="mergeLoraStrengthA" min="0" max="2" step="0.05" value="1" />
+              </label>
+              <label class="field"><span>B strength <output id="mergeLoraStrengthBVal">1.00</output></span>
+                <input type="range" id="mergeLoraStrengthB" min="0" max="2" step="0.05" value="1" />
+              </label>
+            </div>
+            <label class="field"><span>Output filename</span>
+              <input id="mergeLoraName" value="embernest_lora_merge" placeholder="embernest_lora_merge" />
+            </label>
+            <button class="btn btn-primary" id="mergeLoraBtn" type="button">Merge LoRAs</button>
+            <div id="mergeLoraStatus" class="muted merge-status"></div>
+          </details>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section class="panel-page" id="tab-settings" role="tabpanel" aria-label="Settings" hidden>
+      <header class="page-head">
+        <h1>Settings</h1>
+        <p class="muted">Stored on this computer. Changes apply when you press Save.</p>
+      </header>
+
+      <div class="settings-stack">
+        <section class="settings-section" aria-labelledby="setConn">
+          <h2 id="setConn">Connection</h2>
+          <div class="card settings-card">
+            <div class="set-row">
+              <div class="set-label"><strong>ComfyUI</strong><span class="help">The image engine Embernest talks to.</span></div>
+              <div class="set-control">
+                <div class="set-value"><code id="cfgComfyUrl">&mdash;</code> <span id="cfgComfyMode" class="muted"></span></div>
+                <button class="btn btn-sm" id="restartComfyBtn" type="button" hidden>Restart ComfyUI now</button>
+              </div>
+            </div>
+            <label class="set-row">
+              <span class="set-label"><strong>App port</strong><span class="help">Applies after restarting Embernest.</span></span>
+              <span class="set-control"><input type="number" id="cfgPort" min="1" max="65535" inputmode="numeric" /></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-labelledby="setPhone">
+          <h2 id="setPhone">Phone &amp; devices</h2>
+          <div class="card settings-card">
+            <div class="set-row set-row-inline">
+              <div class="set-label"><strong>Listen on LAN</strong><span class="help">Lets your phone reach Embernest over Wi-Fi. Applies after a restart.</span></div>
+              <div class="set-control">
+                <label class="toggle toggle-inline">
+                  <input type="checkbox" id="cfgLan" />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  <span class="sr-only">Listen on LAN</span>
+                </label>
+              </div>
+            </div>
+            <div class="set-row set-row-block">
+              <div class="set-label"><strong>Network access</strong><span class="help">Open a LAN URL from your phone (same Wi-Fi). If it will not connect, allow the port through the OS firewall.</span></div>
+              <dl class="specs" id="networkList"><dt>Detecting&hellip;</dt></dl>
+            </div>
+            <div class="set-row">
+              <div class="set-label"><strong>This device</strong><span class="help">Removes this device's pairing. Scan the code from <code>embernest pair</code> to sign in again.</span></div>
+              <div class="set-control"><button class="btn btn-sm" id="signOutBtn" type="button">Sign out this device</button></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-labelledby="setDefaults">
+          <h2 id="setDefaults">Generation defaults</h2>
+          <div class="card settings-card">
+            <label class="set-row">
+              <span class="set-label"><strong>Denoise</strong><span class="help">How far Edit and Transform move from the original (0 to 1).</span></span>
+              <span class="set-control"><input type="number" id="defDenoise" min="0" max="1" step="0.01" inputmode="decimal" /></span>
+            </label>
+            <label class="set-row">
+              <span class="set-label"><strong>Steps</strong><span class="help">More steps are slower and usually finer.</span></span>
+              <span class="set-control"><input type="number" id="defSteps" min="1" max="200" step="1" inputmode="numeric" /></span>
+            </label>
+            <label class="set-row">
+              <span class="set-label"><strong>CFG</strong><span class="help">How strictly the image follows the prompt.</span></span>
+              <span class="set-control"><input type="number" id="defCfg" min="1" max="30" step="0.5" inputmode="decimal" /></span>
+            </label>
+            <label class="set-row">
+              <span class="set-label"><strong>Seed</strong><span class="help">-1 picks a random seed each time.</span></span>
+              <span class="set-control"><input type="number" id="defSeed" step="1" inputmode="numeric" /></span>
+            </label>
+            <label class="set-row">
+              <span class="set-label"><strong>Max size</strong><span class="help">Longest side in pixels while sampling.</span></span>
+              <span class="set-control"><input type="number" id="defMaxSize" min="256" max="2048" step="64" inputmode="numeric" /></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-labelledby="setTokens">
+          <h2 id="setTokens">API tokens</h2>
+          <div class="card settings-card">
+            <label class="set-row">
+              <span class="set-label"><strong>Civitai API key <em class="muted" id="tokCivitaiState"></em></strong><span class="help">Needed for some downloads. Stored only in <code>config.json</code>. Leave blank to keep the saved value.</span></span>
+              <span class="set-control"><input type="password" id="tokCivitai" placeholder="paste to set or update" autocomplete="off" /></span>
+            </label>
+            <label class="set-row">
+              <span class="set-label"><strong>Hugging Face token <em class="muted" id="tokHfState"></em></strong><span class="help">For gated repositories. Leave blank to keep the saved value.</span></span>
+              <span class="set-control"><input type="password" id="tokHf" placeholder="paste to set or update" autocomplete="off" /></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-labelledby="setSearch">
+          <h2 id="setSearch">Chat search</h2>
+          <div class="card settings-card">
+            <label class="set-row">
+              <span class="set-label"><strong>SearXNG URL</strong><span class="help">Optional. Your own instance, for example <code>https://search.example.org</code>. Empty uses DuckDuckGo. Only the search terms are sent.</span></span>
+              <span class="set-control"><input type="url" id="cfgSearxng" placeholder="Empty: use DuckDuckGo" autocomplete="off" /></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-labelledby="setLook">
+          <h2 id="setLook">Appearance</h2>
+          <div class="card settings-card">
+            <div class="set-row">
+              <div class="set-label"><strong>Theme</strong><span class="help" id="themeHelp">For this device. Auto follows your system setting.</span></div>
+              <div class="set-control">
+                <div class="segmented" data-theme-switch role="group" aria-label="Theme">
+                  <button type="button" data-theme-choice="auto">Auto</button>
+                  <button type="button" data-theme-choice="light">Light</button>
+                  <button type="button" data-theme-choice="dark">Dark</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-labelledby="setAdv">
+          <h2 id="setAdv">Advanced</h2>
+          <div class="card settings-card">
+            <div class="set-row set-row-block">
+              <div class="set-label"><strong>This machine</strong><span class="help">Detected hardware, used for recommendations and the fit badges.</span></div>
+              <dl class="specs" id="specsList"><dt>Detecting&hellip;</dt></dl>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn btn-primary" id="saveSettings" type="button">Save settings</button>
+        <span class="hint" id="settingsHint"></span>
+      </div>
+    </section>
+  </main>
+  </div>
+</div>
+
+  <!-- First run with no checkpoint: pick a first model. Dismissible; nothing downloads until you press Download. -->
+  <section class="welcome" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+    <div class="welcome-inner">
+      <div class="pair-brand">
+        <svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="var(--accent)" d="M24 3c3 6 9 8 9 16a9 9 0 0 1-18 0c0-4 2-6 4-9 1 2 2 3 4 3-1-4-1-7 1-10z" /></svg>
+        <span>Embernest</span>
+      </div>
+      <h1 id="welcomeTitle">Pick your first model</h1>
+      <p>A <strong>checkpoint</strong> is the main model that draws your pictures, and it sets the overall look.
+        You need one before you can create or edit images, and add-ons like LoRAs come later.
+        These are good starting points for your GPU; nothing downloads until you press Download.
+        <button class="info-btn" type="button" data-explain="checkpoint" aria-label="What is a checkpoint?" title="What is a checkpoint?">i</button></p>
+      <div class="suggest-grid welcome-grid" id="welcomeCards"></div>
+      <div class="welcome-foot">
+        <a class="btn" href="#tab=models" data-welcome-browse>Browse and search all models</a>
+        <button class="btn btn-ghost" type="button" data-welcome-skip>Skip for now</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <!-- Shown when the server answers 401 (this device is not paired yet). -->
+  <section class="pair-overlay" id="pairCard" hidden role="dialog" aria-labelledby="pairTitle">
+    <div class="pair-card">
+      <div class="pair-brand">
+        <svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="var(--accent)" d="M24 3c3 6 9 8 9 16a9 9 0 0 1-18 0c0-4 2-6 4-9 1 2 2 3 4 3-1-4-1-7 1-10z" /></svg>
+        <span>Embernest</span>
+      </div>
+      <h2 id="pairTitle">Pair this device</h2>
+      <p>On your computer run <code>embernest pair</code> and scan the QR code.</p>
+      <p class="hint">Or paste the access token:</p>
+      <label class="field">
+        <span>Access token</span>
+        <input type="password" id="pairTokenInput" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      </label>
+      <button class="btn btn-primary" id="pairTokenBtn" type="button">Pair with token</button>
+    </div>
+  </section>
+
+  <script src="/js/explain.js" defer></script>
+  <script src="/js/models-guide.js" defer></script>
+  <script src="/js/chat.js" defer></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>

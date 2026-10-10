@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="robots" content="noindex" />
+  <title>Embernest styleguide</title>
+  <script src="/js/theme.js"></script>
+  <link rel="stylesheet" href="/css/tokens.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <style>
+    /* Layout of this page only. Colours come from tokens. */
+    .sg { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
+    .sg-themes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 16px; align-items: start; }
+    .sg-theme { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 20px; min-width: 0; }
+    .sg-theme > h2 { margin-top: 0; }
+    .sg-sec { margin: 0 0 28px; }
+    .sg-sec > h3 { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 12px; }
+    .sg-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .sg-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+    .sg-sw { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; font-size: var(--fs-xs); }
+    .sg-sw i { display: block; height: 36px; }
+    .sg-sw span { display: block; padding: 4px 8px; color: var(--text-2); background: var(--surface); }
+    .sg-stack > * + * { margin-top: 12px; }
+    .sg-static { position: static; transform: none; display: inline-block; }
+    .sg-sheet { position: relative; display: flex; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; min-height: 190px; background: var(--overlay); }
+  </style>
+</head>
+<body>
+<div class="sg">
+  <h1>Embernest styleguide</h1>
+  <p class="muted">Every component in both themes. Not linked from the app.</p>
+  <div class="sg-themes">
+    <!-- the same block is rendered twice (see script at the bottom) -->
+    <section class="sg-theme" data-theme="dark" id="sgDark"><h2>Dark</h2><div class="sg-body"></div></section>
+    <section class="sg-theme" data-theme="light" id="sgLight"><h2>Light</h2><div class="sg-body"></div></section>
+  </div>
+</div>
+
+<template id="sgTpl">
+  <div class="sg-sec"><h3>Colour roles</h3>
+    <div class="sg-swatches">
+      <div class="sg-sw"><i style="background: var(--bg)"></i><span>bg</span></div>
+      <div class="sg-sw"><i style="background: var(--surface)"></i><span>surface</span></div>
+      <div class="sg-sw"><i style="background: var(--surface-2)"></i><span>surface-2</span></div>
+      <div class="sg-sw"><i style="background: var(--border-strong)"></i><span>border</span></div>
+      <div class="sg-sw"><i style="background: var(--text)"></i><span>text</span></div>
+      <div class="sg-sw"><i style="background: var(--text-muted)"></i><span>text-muted</span></div>
+      <div class="sg-sw"><i style="background: var(--accent)"></i><span>accent</span></div>
+      <div class="sg-sw"><i style="background: var(--danger)"></i><span>danger</span></div>
+      <div class="sg-sw"><i style="background: var(--success)"></i><span>success</span></div>
+      <div class="sg-sw"><i style="background: var(--warning)"></i><span>warning</span></div>
+    </div>
+  </div>
+
+  <div class="sg-sec"><h3>Type</h3>
+    <h1 style="margin-bottom:8px">Heading 1</h1>
+    <h2 style="margin-bottom:8px">Heading 2</h2>
+    <h3 style="margin-bottom:8px;text-transform:none;letter-spacing:0;font-size:var(--fs-md);color:var(--text)">Heading 3</h3>
+    <p>Body text at 15px with a comfortable line height. <a href="#">A link</a> and <code>inline code</code>.</p>
+    <p class="muted">Muted secondary text.</p>
+  </div>
+
+  <div class="sg-sec"><h3>Buttons</h3>
+    <div class="sg-row">
+      <button class="btn btn-primary" type="button">Primary</button>
+      <button class="btn" type="button">Secondary</button>
+      <button class="btn btn-ghost" type="button">Ghost</button>
+      <button class="btn btn-danger" type="button">Danger</button>
+      <button class="btn" type="button" disabled>Disabled</button>
+    </div>
+    <div class="sg-row" style="margin-top:8px">
+      <button class="btn btn-primary btn-sm" type="button">Small</button>
+      <button class="btn btn-primary btn-lg" type="button">Large</button>
+      <button class="btn btn-icon" type="button" aria-label="Menu">&#8942;</button>
+      <button class="btn btn-icon btn-primary" type="button" aria-label="Send">&#10148;</button>
+    </div>
+  </div>
+
+  <div class="sg-sec"><h3>Inputs</h3>
+    <div class="sg-stack">
+      <label class="field"><span>Text input</span><input type="text" placeholder="Placeholder" /></label>
+      <label class="field"><span>Select</span><select><option>SDXL 1.0</option><option>SD 1.5</option></select></label>
+      <label class="field"><span>Textarea</span><textarea rows="3" placeholder="Describe what you want to see"></textarea></label>
+      <label class="field"><span>Slider <output>28</output></span><input type="range" min="1" max="60" value="28" /></label>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" checked /><span class="toggle-track"><span class="toggle-thumb"></span></span>Switch on</label>
+        <label class="toggle"><input type="checkbox" /><span class="toggle-track"><span class="toggle-thumb"></span></span>Switch off</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="sg-sec"><h3>Segmented control and tabs</h3>
+    <div class="segmented"><button type="button" aria-pressed="true">Generate</button><button type="button">Transform</button><button type="button">Edit</button></div>
+    <div class="tabbar" style="margin-top:12px"><button type="button" class="is-active">Installed</button><button type="button">Downloads</button><button type="button">Search</button></div>
+  </div>
+
+  <div class="sg-sec"><h3>Chips, badges, pills</h3>
+    <div class="sg-row">
+      <button class="chip is-active" type="button">Checkpoint</button><button class="chip" type="button">LoRA</button><button class="chip" type="button">NSFW</button>
+    </div>
+    <div class="sg-row" style="margin-top:8px">
+      <span class="badge badge-success">Fits</span><span class="badge badge-warning">Tight</span><span class="badge badge-danger">Too big</span><span class="badge badge-accent">Recommended</span><span class="badge">Neutral</span>
+      <span class="pill">SDXL 1.0</span><span class="pill pill-inpaint">inpaint</span>
+    </div>
+  </div>
+
+  <div class="sg-sec"><h3>Card, note, progress</h3>
+    <div class="card"><h3 style="text-transform:none;letter-spacing:0;font-size:var(--fs-md);color:var(--text)">Card title</h3><p class="muted" style="margin:0">Subtle border, no heavy shadow.</p></div>
+    <div class="note note-info" style="margin-top:12px">Recommended: SDXL 1.0 at up to 1024px.</div>
+    <div class="note note-danger" style="margin-top:12px">Something went wrong.</div>
+    <div class="progress" style="margin-top:12px"><div class="progress-fill" style="width:62%"></div></div>
+  </div>
+
+  <div class="sg-sec"><h3>Sheet and dialog</h3>
+    <div class="sg-stack">
+      <div class="sg-sheet"><div class="sheet" style="align-self:flex-end;border-radius:var(--r-lg) var(--r-lg) 0 0"><h2 style="margin-top:0">Bottom sheet</h2><p class="muted">A bottom sheet on phones, a side panel on desktop.</p><button class="btn btn-primary" type="button">Save</button></div></div>
+      <div class="sg-sheet"><div class="dialog"><h2>Dialog</h2><p>Are you sure?</p><div class="dialog-actions"><button class="btn" type="button">Cancel</button><button class="btn btn-danger" type="button">Delete</button></div></div></div>
+    </div>
+  </div>
+
+  <div class="sg-sec"><h3>Toast</h3>
+    <div class="sg-row"><div class="toast sg-static">Settings saved</div><div class="toast sg-static is-ok">Installed</div><div class="toast sg-static is-error">Download failed</div></div>
+  </div>
+
+  <div class="sg-sec"><h3>Empty state and skeleton</h3>
+    <div class="card"><div class="empty"><div class="empty-icon">&#9672;</div><h3>No models yet</h3><p>Search above to download your first model.</p></div></div>
+    <div class="skeleton" style="margin-top:12px;max-width:260px"><div class="sk-thumb"></div><div class="sk-line"></div><div class="sk-line short"></div></div>
+  </div>
+</template>
+
+<script>
+  (function () {
+    var tpl = document.getElementById('sgTpl');
+    document.querySelectorAll('.sg-body').forEach(function (el) { el.appendChild(tpl.content.cloneNode(true)); });
+    // Each preview column is a fixed theme; the page-level theme only affects the page chrome.
+    document.querySelectorAll('.sg-theme').forEach(function (el) { el.style.colorScheme = el.getAttribute('data-theme'); });
+  })();
+</script>
+</body>
+</html>
