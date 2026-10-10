@@ -133,6 +133,7 @@ function Install-Embernest {
     # Keep the old command name working too.
     Copy-Item -Force -Path $shim -Destination (Join-Path $binDir 'pixelkiln.cmd')
     Write-Host "Installed $shim (and pixelkiln.cmd as an alias)"
+    Write-Host "Docs: https://github.com/$Repo#readme"
 
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     if (-not $userPath) { $userPath = '' }

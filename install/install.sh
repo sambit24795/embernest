@@ -175,6 +175,7 @@ if [ "$(env_or_legacy NO_SETUP)" = 1 ]; then
   exit 0
 fi
 # Under `curl | sh` stdin is the script, so setup reads answers from the terminal.
+say "Docs: https://github.com/$REPO#readme"
 if ( : </dev/tty ) 2>/dev/null; then
   "$BIN_DIR/embernest" setup </dev/tty
 else

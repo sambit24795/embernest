@@ -12,6 +12,7 @@ const { resolveDevice } = require('../install/llm');
 
 const STOP_TIMEOUT_MS = 15000;
 const POLL_MS = 200;
+const WIN_GRACE_MS = 3000;
 
 /** @param {number} ms */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -147,7 +148,11 @@ async function collectStatus(paths) {
  */
 async function signalStop(pid) {
   if (isWindows()) {
-    await run('taskkill', ['/PID', String(pid), '/T']);
+    // Without /F, taskkill can only close windowed processes; the background server has
+    // no window, so try politely, then force the whole tree (server, ComfyUI, llama-server).
+    await run('taskkill', ['/PID', String(pid), '/T']).catch(() => {});
+    for (let waited = 0; pidAlive(pid) && waited < WIN_GRACE_MS; waited += POLL_MS) await sleep(POLL_MS);
+    if (pidAlive(pid)) await run('taskkill', ['/PID', String(pid), '/T', '/F']).catch(() => {});
     return;
   }
   process.kill(pid, 'SIGTERM');
