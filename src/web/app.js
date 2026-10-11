@@ -82,13 +82,22 @@ async function api(path, options) {
 }
 
 let toastTimer;
-function toast(message, kind = '') {
+/** Show a toast. `action` ({ label, run }) adds a button, e.g. "View". */
+function toast(message, kind = '', action = null) {
   const el = $('#toast');
-  el.textContent = message;
   el.className = `toast ${kind ? `is-${kind}` : ''}`;
+  el.textContent = message;
+  if (action) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-action';
+    btn.textContent = action.label;
+    btn.addEventListener('click', () => { el.hidden = true; action.run(); });
+    el.append(' ', btn);
+  }
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 4200);
+  toastTimer = setTimeout(() => { el.hidden = true; }, action ? 8000 : 4200);
 }
 
 /* ----------------------------- state ----------------------------- */
@@ -126,15 +135,15 @@ function fitBadge(reqVram) {
 }
 
 /* ----------------------------- tabs / routing -----------------------------
-   Deep links: #tab=chat|create|models|settings, plus &mode=generate|transform|edit
+   Deep links: #tab=chat|create|gallery|models|settings, plus &mode=generate|transform|edit
    for Create, &q=<search> for Models and &c=<id> / &new=1 / &persona=<id>&edit=1 for Chat. Old links (#edit, #generate, #models, …) still work.
    Internally every screen is a panel (#tab-<panel>); the three Create modes are
    the panels "generate", "transform" and "edit". */
-const MAIN_TABS = ['chat', 'create', 'models', 'settings'];
+const MAIN_TABS = ['chat', 'create', 'gallery', 'models', 'settings'];
 const CREATE_MODES = ['generate', 'transform', 'edit'];
 const DEFAULT_TAB = 'create';
 const DEFAULT_MODE = 'generate';
-const PANELS = ['chat', 'edit', 'generate', 'transform', 'models', 'settings'];
+const PANELS = ['chat', 'edit', 'generate', 'transform', 'gallery', 'models', 'settings'];
 
 /** Parse location.hash into { tab, mode }. Unknown values fall back to the defaults. */
 function parseRoute(hash = location.hash) {
@@ -144,6 +153,7 @@ function parseRoute(hash = location.hash) {
   let mode = params.get('mode');
   if (!raw.includes('=') && raw) { tab = raw; } // legacy "#edit"
   if (CREATE_MODES.includes(tab)) { mode = tab; tab = 'create'; }
+  const galleryMode = tab === 'gallery' && CREATE_MODES.includes(mode) ? mode : '';
   if (!MAIN_TABS.includes(tab)) tab = DEFAULT_TAB;
   if (!CREATE_MODES.includes(mode)) mode = DEFAULT_MODE;
   const q = tab === 'models' ? (params.get('q') || '').trim() : '';
@@ -155,7 +165,8 @@ function parseRoute(hash = location.hash) {
     c: params.get('c') || '', new: params.get('new') === '1', persona: params.get('persona') || '',
     edit: params.get('edit') === '1', focus: params.get('focus') || '', menu: params.get('menu') === '1',
   } : null;
-  return { tab, mode, q, goal, explain, chat, hash: raw };
+  const view = params.get('view') || ''; // open the image viewer on a result (promptId)
+  return { tab, mode, q, goal, explain, chat, galleryMode, view, hash: raw };
 }
 
 /** Name of the panel that is on screen for a route. */
@@ -200,6 +211,7 @@ function showRoute(route = parseRoute()) {
   }
   if (name === 'models') loadDownloads();
   guideRoute(route);
+  galleryRoute(route, name);
   if (name === 'chat') loadChat(route).catch((err) => showChatError(err.message, err.hint));
   updateAllRunEnabled();
 }
@@ -456,44 +468,13 @@ function createForgeTab(opts) {
     refs[role] = opts.root.querySelector(selector);
   }
 
-  const tab = { kind: opts.kind, opts, refs, busy: false, imageFile: null, job: null, es: null };
+  const tab = { kind: opts.kind, opts, refs, busy: false, imageFile: null };
 
   tab.updateOutputs = () => {
     if (refs.denoise && refs.denoiseOut) refs.denoiseOut.textContent = Number(refs.denoise.value).toFixed(2);
     if (refs.steps && refs.stepsOut) refs.stepsOut.textContent = refs.steps.value;
     if (refs.cfg && refs.cfgOut) refs.cfgOut.textContent = Number(refs.cfg.value).toFixed(1);
     if (refs.loraStrength && refs.loraStrengthOut) refs.loraStrengthOut.textContent = Number(refs.loraStrength.value).toFixed(2);
-  };
-
-  // Form fields remembered at run time, so "Reuse settings" can restore them.
-  const VALUE_ROLES = ['positive', 'negative', 'prompt', 'checkpoint', 'maxSize', 'denoise', 'steps', 'cfg', 'seed',
-    'sampler', 'scheduler', 'lora', 'loraStrength', 'width', 'height', 'baseModelSelect'];
-  const CHECK_ROLES = ['preserveFace', 'restoreSize'];
-  tab.snapshot = () => {
-    const snap = {};
-    VALUE_ROLES.forEach((r) => { if (refs[r]) snap[r] = refs[r].value; });
-    CHECK_ROLES.forEach((r) => { if (refs[r]) snap[r] = refs[r].checked; });
-    tab.lastValues = snap;
-  };
-  tab.reuseSettings = () => {
-    const snap = tab.lastValues;
-    if (!snap) return;
-    VALUE_ROLES.forEach((r) => { if (refs[r] && r in snap) refs[r].value = snap[r]; });
-    CHECK_ROLES.forEach((r) => { if (refs[r] && r in snap) refs[r].checked = snap[r]; });
-    tab.updateOutputs();
-    tab.updateRunEnabled();
-    toast('Settings restored', 'ok');
-    opts.root.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-  tab.setResultActions = (on) => {
-    [refs.reuseBtn, refs.deleteBtn].forEach((b) => { if (b) b.hidden = !on; });
-    if (refs.downloadBtn && !on) refs.downloadBtn.hidden = true;
-  };
-  tab.clearResult = () => {
-    if (refs.compare) refs.compare.hidden = true;
-    if (refs.outputMeta) refs.outputMeta.hidden = true;
-    if (refs.resultPlaceholder) refs.resultPlaceholder.hidden = false;
-    tab.setResultActions(false);
   };
 
   tab.updateRunEnabled = () => {
@@ -507,121 +488,27 @@ function createForgeTab(opts) {
     else refs.hint.textContent = opts.readyHint ? opts.readyHint(tab) : 'Ready.';
   };
 
-  tab.setProgress = (job) => {
-    if (refs.phase) refs.phase.textContent = job.phaseLabel || 'Working…';
-    if (!refs.progressFill) return;
-    if (job.step && job.step.max) {
-      refs.progressFill.style.width = `${Math.round((job.step.value / job.step.max) * 100)}%`;
-      if (refs.progressText) refs.progressText.textContent = `${job.nodeTitle || 'Sampling'} · step ${job.step.value}/${job.step.max}`;
-    } else {
-      refs.progressFill.style.width = `${job.percent || 0}%`;
-      if (refs.progressText) refs.progressText.textContent = job.phaseLabel || '';
-    }
-  };
-
-  tab.finishError = (message) => {
-    tab.busy = false;
-    if (refs.resultLoading) refs.resultLoading.hidden = true;
-    if (refs.resultPlaceholder) refs.resultPlaceholder.hidden = true;
-    if (refs.compare) refs.compare.hidden = true;
-    if (refs.outputMeta) refs.outputMeta.hidden = true;
-    if (refs.runBtn) refs.runBtn.querySelector('.spinner-mini').hidden = true;
-    if (refs.resultErrorText) refs.resultErrorText.textContent = message;
-    if (refs.resultError) refs.resultError.hidden = false;
-    tab.setResultActions(false);
-    tab.updateRunEnabled();
-    toast(`${opts.errorToast || 'Job failed'}: ${message}`, 'error');
-  };
-
-  tab.showResult = (job) => {
-    const after = job.after || (job.images[0] && job.images[0].url) || '';
-    if (refs.compareAfter) refs.compareAfter.src = after;
-    if (refs.compare) {
-      if (opts.withCompare && job.before && refs.compareBefore) {
-        refs.compareBefore.src = job.before;
-        refs.compareBefore.hidden = false;
-        if (refs.compareBeforeTag) refs.compareBeforeTag.hidden = false;
-        if (refs.compareHandle) refs.compareHandle.hidden = false;
-      } else {
-        if (refs.compareBefore) { refs.compareBefore.hidden = true; refs.compareBefore.removeAttribute('src'); }
-        if (refs.compareBeforeTag) refs.compareBeforeTag.hidden = true;
-        if (refs.compareHandle) refs.compareHandle.hidden = true;
-      }
-      refs.compare.style.setProperty('--pos', '50%');
-      refs.compare.hidden = false;
-    }
-    if (refs.metaList) {
-      refs.metaList.innerHTML = renderJobMeta(job);
-      if (refs.outputMeta) refs.outputMeta.hidden = false;
-    }
-    if (refs.downloadBtn) {
-      refs.downloadBtn.hidden = !after;
-      refs.downloadBtn.onclick = () => downloadResult(after, opts.downloadPrefix || 'embernest');
-    }
-    tab.setResultActions(true);
-    if (refs.downloadBtn) refs.downloadBtn.hidden = !after;
-  };
-
-  tab.track = (jobId) => {
-    const apply = (job) => {
-      tab.job = job;
-      tab.setProgress(job);
-      if (!['done', 'error', 'cancelled', 'blocked'].includes(job.status)) return;
-
-      if (tab.es) { tab.es.close(); tab.es = null; }
-      tab.busy = false;
-      if (refs.resultLoading) refs.resultLoading.hidden = true;
-      if (refs.runBtn) refs.runBtn.querySelector('.spinner-mini').hidden = true;
-      tab.updateRunEnabled();
-
-      if (job.status === 'done') {
-        tab.showResult(job);
-        toast(opts.doneToast || 'Done 🔥', 'ok');
-      } else if (job.status === 'error' || job.status === 'blocked') {
-        tab.finishError(job.error || 'Unknown error');
-      } else {
-        if (refs.resultPlaceholder) refs.resultPlaceholder.hidden = false;
-        toast('Cancelled');
-      }
-      loadQueue();
-      loadHistory();
-    };
-
-    if (tab.es) tab.es.close();
-    const es = new EventSource(`/api/jobs/${jobId}/events`);
-    tab.es = es;
-    es.onmessage = (ev) => { try { apply(JSON.parse(ev.data)); } catch (_) { /* ignore */ } };
-  };
-
   tab.run = async () => {
     if (tab.busy) return;
     if (opts.withImage && !tab.imageFile) return;
+    // busy only covers the hand-off; the job then lives in the feed, so more can be queued.
     tab.busy = true;
     tab.updateRunEnabled();
-
-    if (refs.resultPlaceholder) refs.resultPlaceholder.hidden = true;
-    if (refs.compare) refs.compare.hidden = true;
-    if (refs.outputMeta) refs.outputMeta.hidden = true;
-    if (refs.resultError) refs.resultError.hidden = true;
-    if (refs.resultLoading) refs.resultLoading.hidden = false;
-    tab.setResultActions(false);
-    tab.snapshot();
-    // On a phone the result sits below the form: bring the progress into view.
-    const card = refs.resultLoading && refs.resultLoading.closest('.result-card');
-    if (card && window.matchMedia('(max-width: 899.98px)').matches) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (refs.runBtn) {
-      refs.runBtn.disabled = true;
       const spin = refs.runBtn.querySelector('.spinner-mini');
       if (spin) spin.hidden = false;
     }
-    tab.setProgress({ phaseLabel: opts.uploadingLabel || 'Starting', percent: 3, step: null });
-
     try {
       const { url, options } = opts.buildRequest(tab, refs);
       const data = await api(url, options);
-      tab.track(data.job.id);
+      feedTrack(data.job);
+      if (isPhone()) toast('Started: progress is below the form');
     } catch (err) {
-      tab.finishError(err.message);
+      toast(`${opts.errorToast || 'Job failed'}: ${err.message}`, 'error');
+    } finally {
+      tab.busy = false;
+      if (refs.runBtn) refs.runBtn.querySelector('.spinner-mini').hidden = true;
+      tab.updateRunEnabled();
     }
   };
 
@@ -649,46 +536,13 @@ function createForgeTab(opts) {
   }
 
   if (refs.runBtn) refs.runBtn.addEventListener('click', tab.run);
-  if (refs.cancelBtn) refs.cancelBtn.addEventListener('click', async () => {
-    if (!tab.job || !tab.job.id) return;
-    try { await api(`/api/jobs/${tab.job.id}`, { method: 'DELETE' }); }
-    catch (err) { toast(err.message, 'error'); }
-  });
-  if (refs.reuseBtn) refs.reuseBtn.addEventListener('click', tab.reuseSettings);
-  if (refs.deleteBtn) refs.deleteBtn.addEventListener('click', async () => {
-    if (!tab.job || !tab.job.promptId) return;
-    if (await deleteHistory(tab.job.promptId)) tab.clearResult();
-  });
-  if (refs.refreshQueue) refs.refreshQueue.addEventListener('click', () => { loadQueue(); loadHistory(); });
-  if (refs.interruptBtn) refs.interruptBtn.addEventListener('click', interruptQueue);
-
   ['denoise', 'steps', 'cfg', 'loraStrength'].forEach((role) => {
     if (refs[role]) refs[role].addEventListener('input', tab.updateOutputs);
   });
   if (refs.checkpoint && opts.onCheckpointChange) {
     refs.checkpoint.addEventListener('change', () => opts.onCheckpointChange(tab));
   }
-  if (refs.compare && refs.compareHandle) bindCompare(refs.compare, refs.compareHandle);
-
   return tab;
-}
-
-/** Details panel rows for a finished job. */
-function renderJobMeta(job) {
-  const s = job.settings || {};
-  const rows = [['Prompt ID', job.promptId], ['Checkpoint', s.checkpoint]];
-  if (job.kind === 'generate') {
-    rows.push(['Size', `${s.width}×${s.height}`]);
-  } else {
-    if (job.kind === 'edit') rows.push(['Original', s.width && s.height ? `${s.width}×${s.height}` : '—']);
-    rows.push(['Sampled at', s.maxSize ? `${s.maxSize}px` : '—']);
-    if (job.kind === 'edit') rows.push(['Preserve face', s.preserveFace ? 'yes' : 'no']);
-    if (job.kind !== 'generate') rows.push(['Restore size', s.restoreSize ? 'yes' : 'no']);
-  }
-  rows.push(['Steps', s.steps], ['CFG', s.cfg], ['Sampler', s.sampler], ['Scheduler', s.scheduler], ['Seed', s.seed]);
-  return rows
-    .filter(([, v]) => v !== undefined && v !== null && v !== '')
-    .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
 }
 
 /** Trigger a browser download for a result URL. */
@@ -700,65 +554,6 @@ function downloadResult(url, prefix) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-}
-
-/* ----------------------------- queue / history ----------------------------- */
-/** Refresh the queue status line in every forge tab. */
-async function loadQueue() {
-  const statuses = Object.values(state.tabs).map((t) => t.refs.queueStatus).filter(Boolean);
-  if (!statuses.length) return;
-  try {
-    const q = await api('/api/queue');
-    const parts = [`${q.running.length} running`, `${q.pending.length} pending`];
-    if (q.activeEdits.length) parts.push(`${q.activeEdits.length} active`);
-    statuses.forEach((el) => { el.textContent = parts.join(' · '); });
-  } catch (err) {
-    statuses.forEach((el) => { el.textContent = `Queue unavailable: ${err.message}`; });
-  }
-}
-
-/** Show recent results as thumbnails with a delete button in every forge tab. */
-async function loadHistory() {
-  const grids = Object.values(state.tabs).map((t) => t.refs.historyGrid).filter(Boolean);
-  if (!grids.length) return;
-  try {
-    const data = await api('/api/history?limit=12');
-    const html = data.items.length
-      ? data.items.flatMap((item) => item.images.map((img) => (
-        `<div class="history-item">
-          <a href="${esc(img.url)}" target="_blank" rel="noopener"><img class="history-thumb" src="${esc(img.url)}" alt="Recent result" loading="lazy" /></a>
-          <button class="history-delete" type="button" data-prompt-id="${esc(item.promptId)}" title="Delete" aria-label="Delete this result">&times;</button>
-        </div>`
-      ))).join('')
-      : '<div class="empty empty-sm"><p>No results yet. Your recent images will show up here.</p></div>';
-    grids.forEach((g) => { g.innerHTML = html; });
-  } catch (err) {
-    grids.forEach((g) => { g.innerHTML = `<p class="muted">${esc(err.message)}</p>`; });
-  }
-}
-
-/** Delete a result's files + history entry, then refresh the grids. */
-async function deleteHistory(promptId) {
-  try {
-    await api(`/api/history/${encodeURIComponent(promptId)}`, { method: 'DELETE' });
-    toast('Deleted', 'ok');
-    loadHistory();
-    return true;
-  } catch (err) {
-    toast(err.message, 'error');
-    return false;
-  }
-}
-
-/** Interrupt whatever ComfyUI is currently running. */
-async function interruptQueue() {
-  try {
-    await api('/api/interrupt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    toast('Interrupt sent', 'ok');
-  } catch (err) {
-    toast(err.message, 'error');
-  }
-  setTimeout(loadQueue, 1000);
 }
 
 /* ----------------------------- compare slider ----------------------------- */
@@ -1334,15 +1129,7 @@ const editTab = createForgeTab({
     seed: '#seed', sampler: '#sampler', scheduler: '#scheduler',
     lora: '#lora', loraStrength: '#loraStrength', loraStrengthOut: '#loraStrengthOut',
     preserveFace: '#preserveFace', restoreSize: '#restoreSize', baseModelSelect: '#baseModelSelect',
-    runBtn: '#runBtn', hint: '#editHint', cancelBtn: '#cancelEditBtn',
-    resultPlaceholder: '#resultPlaceholder', resultLoading: '#resultLoading', resultError: '#resultError',
-    resultErrorText: '#resultErrorText', phase: '#editPhase', progressFill: '#editProgressFill',
-    progressText: '#editProgressText', compare: '#compare', compareBefore: '#compareBefore',
-    compareAfter: '#compareAfter', compareHandle: '#compareHandle', compareBeforeTag: '#compareBeforeTag',
-    outputMeta: '#outputMeta', metaList: '#outputMetaList', downloadBtn: '#downloadResultBtn',
-    reuseBtn: '#reuseEditBtn', deleteBtn: '#deleteEditBtn',
-    queueStatus: '#queueStatus', historyGrid: '#historyGrid',
-    refreshQueue: '#refreshQueue', interruptBtn: '#interruptBtn',
+    runBtn: '#runBtn', hint: '#editHint',
   },
   buildRequest: (tab, refs) => {
     const fd = new FormData();
@@ -1389,15 +1176,7 @@ const generateTab = createForgeTab({
     steps: '#genSteps', stepsOut: '#genStepsOut', cfg: '#genCfg', cfgOut: '#genCfgOut',
     seed: '#genSeed', sampler: '#genSampler', scheduler: '#genScheduler',
     lora: '#genLora', loraStrength: '#genLoraStrength', loraStrengthOut: '#genLoraStrengthOut',
-    runBtn: '#genRunBtn', hint: '#genHint', cancelBtn: '#genCancelBtn',
-    resultPlaceholder: '#genResultPlaceholder', resultLoading: '#genResultLoading', resultError: '#genResultError',
-    resultErrorText: '#genResultErrorText', phase: '#genPhase', progressFill: '#genProgressFill',
-    progressText: '#genProgressText', compare: '#genCompare', compareAfter: '#genCompareAfter',
-    compareHandle: '#genCompareHandle',
-    outputMeta: '#genOutputMeta', metaList: '#genOutputMetaList', downloadBtn: '#genDownloadBtn',
-    reuseBtn: '#genReuseBtn', deleteBtn: '#genDeleteBtn',
-    queueStatus: '#genQueueStatus', historyGrid: '#genHistoryGrid',
-    refreshQueue: '#genRefreshQueue', interruptBtn: '#genInterruptBtn',
+    runBtn: '#genRunBtn', hint: '#genHint',
   },
   buildRequest: (tab, refs) => {
     const payload = {
@@ -1441,15 +1220,7 @@ const transformTab = createForgeTab({
     steps: '#tfSteps', stepsOut: '#tfStepsOut', cfg: '#tfCfg', cfgOut: '#tfCfgOut',
     seed: '#tfSeed', sampler: '#tfSampler', scheduler: '#tfScheduler', restoreSize: '#tfRestoreSize',
     lora: '#tfLora', loraStrength: '#tfLoraStrength', loraStrengthOut: '#tfLoraStrengthOut',
-    runBtn: '#tfRunBtn', hint: '#tfHint', cancelBtn: '#tfCancelBtn',
-    resultPlaceholder: '#tfResultPlaceholder', resultLoading: '#tfResultLoading', resultError: '#tfResultError',
-    resultErrorText: '#tfResultErrorText', phase: '#tfPhase', progressFill: '#tfProgressFill',
-    progressText: '#tfProgressText', compare: '#tfCompare', compareBefore: '#tfCompareBefore',
-    compareAfter: '#tfCompareAfter', compareHandle: '#tfCompareHandle', compareBeforeTag: '#tfCompareBeforeTag',
-    outputMeta: '#tfOutputMeta', metaList: '#tfOutputMetaList', downloadBtn: '#tfDownloadBtn',
-    reuseBtn: '#tfReuseBtn', deleteBtn: '#tfDeleteBtn',
-    queueStatus: '#tfQueueStatus', historyGrid: '#tfHistoryGrid',
-    refreshQueue: '#tfRefreshQueue', interruptBtn: '#tfInterruptBtn',
+    runBtn: '#tfRunBtn', hint: '#tfHint',
   },
   buildRequest: (tab, refs) => {
     const fd = new FormData();
@@ -1487,22 +1258,19 @@ async function init() {
   bindSettings();
   bindChat();
   bindGuide();
+  bindViewer();
+  bindGallery();
   renderBaseModelOptions();
 
   // Switch to the tab named in the hash immediately (not only after the
   // async status/config fetches finish), so a reload on #generate stays put.
   showRoute();
+  feedInit();
 
   // "Reset to recommended" re-applies the Edit auto-config on demand.
   $('#resetRecommendedBtn').addEventListener('click', () => {
     autoConfigureEditTab(state.tabs.edit);
     toast('Applied recommended settings', 'ok');
-  });
-
-  // History delete buttons appear in multiple tabs — delegate globally.
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.history-delete');
-    if (btn && btn.dataset.promptId) deleteHistory(btn.dataset.promptId);
   });
 
   // Paste a clipboard image straight into the active image tab (Edit/Transform).
@@ -1537,8 +1305,6 @@ async function init() {
   loadInstalled();
   loadDownloads();
   loadNetwork();
-  loadQueue();
-  loadHistory();
 }
 
 async function loadSpecs() {

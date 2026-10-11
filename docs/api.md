@@ -104,7 +104,7 @@ Results are returned as image URLs under `/api/image`.
 | GET | `/api/queue` | yes | ComfyUI's running and pending prompts, plus active Embernest jobs |
 | POST | `/api/interrupt` | yes | Stop the running prompt |
 | DELETE | `/api/queue/:promptId` | yes | Remove a pending prompt |
-| GET | `/api/history?limit=` | yes | Recent results (`limit` 1–50, default 12) with image URLs |
+| GET | `/api/history?limit=&offset=&mode=` | yes | Results, newest first (`limit` 1–100, default 12; optional `mode` generate, transform or edit). Each item has image URLs, `mode`, `prompt`, `settings`, `createdAt` and, for edits and transforms, `before`; the reply adds `total` and `hasMore`. Edits still held by the safety check are left out |
 | DELETE | `/api/history/:promptId` | yes | Delete a result's image files from ComfyUI's output folder and remove it from history |
 | GET | `/api/image?filename=&subfolder=&type=` | yes | Proxy one image from ComfyUI. Photo-edit results are not served until they pass the nudity check. |
 

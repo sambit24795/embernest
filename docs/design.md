@@ -4,7 +4,7 @@ Direction: calm, modern, content-first. A neutral base (near-black slate in dark
 ember/amber accent, used sparingly: primary buttons, the active nav item, focus rings and sliders. Subtle borders instead of
 heavy shadows. Review everything in `src/web/styleguide.html` (not linked from the app).
 
-Files: `src/web/css/tokens.css` (the only place with raw colours), `base.css`, `components.css`, `layout.css`, `screens.css` (Create, Models, Settings), `chat.css` (Chat) and `guide.css` (model guide: welcome, suggestions, explainers, hints). Chat logic is in `src/web/js/chat.js`.
+Files: `src/web/css/tokens.css` (the only place with raw colours), `base.css`, `components.css`, `layout.css`, `screens.css` (Create, Models, Settings), `chat.css` (Chat) and `guide.css` (model guide: welcome, suggestions, explainers, hints) and `gallery.css` (feed, thumbnails, viewer, Gallery). Chat logic is in `src/web/js/chat.js`.
 `src/web/js/theme.js` handles the theme.
 
 ## Tokens
@@ -46,10 +46,12 @@ Body and muted text meet WCAG AA on their surfaces in both themes.
 
 ## Layout
 
-- Desktop (>= 768px): left sidebar with the app name, four nav items (Chat, Create, Models, Settings) and the engine status.
-- Phone (< 768px): slim top bar (name and status) and a bottom nav with the same four items. At most five items; Settings is one of them.
-- Create has a segmented switch: Generate, Transform, Edit.
-- Deep links: `#tab=chat|create|models|settings`, `#tab=models&goal=<goal>` (Suggested tab), `#explain=<checkpoint|inpainting|lora|embedding|vae|families>` (opens a "What is this?" sheet), `#tab=create&mode=generate|transform|edit`, `#tab=chat&c=<conversation id>`, `#tab=chat&new=1`, `#tab=chat&persona=<id>&edit=1[&focus=memories]`. Old `#edit`-style links still work.
+- Desktop (>= 768px): left sidebar with the app name, five nav items (Chat, Create, Gallery, Models, Settings) and the engine status.
+- Phone (< 768px): slim top bar (name and status) and a bottom nav with the same five items (the maximum; Settings is one of them).
+- Create has a segmented switch: Generate, Transform, Edit. Next to the form (below it on phone) sits a live feed: an "In progress" card per running or queued job (all kinds, with Cancel) and a "Recent" grid of the latest results. A finished job joins Recent with a brief highlight and a "View" toast; it never takes over the screen. The Create button stays enabled so several prompts can be queued.
+- Viewer (`gallery.css`, `js/gallery.js`): full-screen on phone, image plus side panel on desktop. Prev/next by buttons, arrow keys and swipe; before/after slider for edit and transform; Download, Reuse settings and Delete (inline confirm).
+- Gallery: all results, filter chips All, Generate, Transform, Edit, infinite scroll, multi-select delete.
+- Deep links: `#tab=chat|create|gallery|models|settings`, `#tab=models&goal=<goal>` (Suggested tab), `#explain=<checkpoint|inpainting|lora|embedding|vae|families>` (opens a "What is this?" sheet), `#tab=create&mode=generate|transform|edit`, `#tab=gallery[&mode=generate|transform|edit]`, `&view=<result id>` (opens the viewer), `#tab=chat&c=<conversation id>`, `#tab=chat&new=1`, `#tab=chat&persona=<id>&edit=1[&focus=memories]`. Old `#edit`-style links still work.
 - Chat on phone: the list is its own screen, and opening a conversation pushes a history entry, so Back returns to the list (the chat header arrow does the same).
 - Chat shows skeleton rows in the list and the pane until its first data arrives, then the empty or not-set-up states.
 - Support 360px wide and up, with no horizontal page scroll. Respect `env(safe-area-inset-*)`.

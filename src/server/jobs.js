@@ -393,6 +393,7 @@ async function cancelJob(id, client) {
   if (!job) return null;
   if (['done', 'error', 'cancelled', 'blocked'].includes(job.status)) return snapshot(job);
 
+  const wasRunning = job.status === 'running';
   job.status = 'cancelled';
   job.phase = 'cancelled';
   job.phaseLabel = 'Cancelled';
@@ -400,8 +401,11 @@ async function cancelJob(id, client) {
   if (job.stop) job.stop();
   update(job, true);
 
-  // Best-effort: stop ComfyUI work for this client and drop any pending prompt.
-  try { await client.interrupt(job.clientId); } catch (_) { /* ignore */ }
+  // Best-effort: drop the pending prompt, and interrupt ComfyUI only if THIS job is the one
+  // running (its interrupt is global, so a queued job's cancel must not stop another job).
+  if (wasRunning) {
+    try { await client.interrupt(job.clientId); } catch (_) { /* ignore */ }
+  }
   if (job.promptId) {
     try { await client.deleteFromQueue(job.promptId); } catch (_) { /* ignore */ }
   }

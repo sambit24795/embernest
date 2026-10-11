@@ -4,6 +4,7 @@ const path = require('path');
 const fsp = require('fs/promises');
 const jobs = require('../jobs');
 const { toNum } = require('../util');
+const { modeFromFilename, extractFromGraph, graphOf, createdAtOf } = require('../historyMeta');
 
 /** ComfyUI queue entries are tuples: [number, promptId, workflow, extra]. */
 function queueItem(entry) {
@@ -73,21 +74,38 @@ function register(app, ctx) {
     }
   });
 
-  /** GET /api/history?limit=12 — recent results with proxied image URLs. */
+  /**
+   * GET /api/history?limit=12&offset=0&mode=generate|transform|edit
+   * Results (newest first) with proxied image URLs, mode, prompt, key settings,
+   * createdAt and, for edit/transform, the `before` image. Held photo edits are hidden.
+   */
   app.get('/api/history', async (req, res) => {
     try {
-      const limit = Math.min(50, Math.max(1, Math.round(toNum(req.query.limit, 12))));
+      const limit = Math.min(100, Math.max(1, Math.round(toNum(req.query.limit, 12))));
+      const offset = Math.max(0, Math.round(toNum(req.query.offset, 0)));
+      const wantMode = ['generate', 'transform', 'edit'].includes(req.query.mode) ? req.query.mode : null;
       const client = comfy();
       const all = await client.getAllHistory();
-      const items = Object.entries(all)
+      const visible = Object.entries(all)
         .map(([promptId, entry]) => {
           const images = client.collectImages(entry).map((img) => ({ ...img, url: jobs.imageProxyUrl(img) }));
-          return { promptId, images, status: (entry.status && entry.status.status_str) || 'success' };
+          const meta = extractFromGraph(graphOf(entry));
+          return {
+            promptId,
+            images,
+            status: (entry.status && entry.status.status_str) || 'success',
+            mode: images.length ? modeFromFilename(images[0].filename) : null,
+            prompt: meta.prompt,
+            settings: meta.settings,
+            createdAt: createdAtOf(entry),
+            before: meta.before ? jobs.imageProxyUrl({ ...meta.before, type: 'input' }) : null,
+          };
         })
         .filter((item) => item.images.length && !jobs.isHeldPrompt(item.promptId))
-        .reverse()
-        .slice(0, limit);
-      res.json({ items });
+        .filter((item) => !wantMode || item.mode === wantMode)
+        .reverse();
+      const items = visible.slice(offset, offset + limit);
+      res.json({ items, total: visible.length, hasMore: offset + items.length < visible.length });
     } catch (err) {
       res.status(502).json({ error: 'Could not read ComfyUI history', detail: err.message });
     }

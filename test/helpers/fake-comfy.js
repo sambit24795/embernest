@@ -55,7 +55,7 @@ async function startFakeComfy({ checkpoints = ['a.safetensors'], loras = [], fai
   const sent = (ws, type, data) => ws.send(JSON.stringify({ type, data }));
 
   /** Play the execution of one prompt over the client's WebSocket. */
-  async function execute(promptId, clientId) {
+  async function execute(promptId, clientId, workflow = {}) {
     // jobs.js connects its WebSocket only after /prompt returns; wait for it.
     for (let i = 0; i < 40 && !sockets.has(clientId); i += 1) await sleep(25);
     const ws = sockets.get(clientId);
@@ -75,9 +75,12 @@ async function startFakeComfy({ checkpoints = ['a.safetensors'], loras = [], fai
       if (live()) sent(ws, 'progress', { ...base, node: '3', value, max: 3 });
       await sleep(10);
     }
+    const save = Object.values(workflow).find((n) => n && n.class_type === 'SaveImage');
+    const prefix = save && save.inputs && save.inputs.filename_prefix;
     history[promptId] = {
-      outputs: { 9: { images: [{ filename: `${promptId}.png`, subfolder: '', type: 'output' }] } },
-      status: { status_str: 'success', completed: true, messages: [] },
+      prompt: [1, promptId, workflow, { client_id: clientId }],
+      outputs: { 9: { images: [{ filename: prefix ? `${prefix}_00001_.png` : `${promptId}.png`, subfolder: '', type: 'output' }] } },
+      status: { status_str: 'success', completed: true, messages: [['execution_start', { prompt_id: promptId, timestamp: Date.now() }]] },
     };
     queue.running = queue.running.filter((e) => e[1] !== promptId);
     if (live()) {
@@ -129,7 +132,7 @@ async function startFakeComfy({ checkpoints = ['a.safetensors'], loras = [], fai
       const { client_id: clientId } = parsed();
       const promptId = crypto.randomUUID();
       queue.running.push([1, promptId, parsed().prompt || {}, { client_id: clientId }]);
-      execute(promptId, clientId).catch(() => {});
+      execute(promptId, clientId, parsed().prompt || {}).catch(() => {});
       return json(res, { prompt_id: promptId, number: 1, node_errors: {} });
     }
     if (req.method === 'GET' && p.startsWith('/history/')) {

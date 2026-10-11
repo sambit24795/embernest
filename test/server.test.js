@@ -318,3 +318,99 @@ test('while an edit is being checked, its result is hidden from history and /api
   assert.strictEqual(job.status, 'done');
   assert.strictEqual((await fetch(`${base}/api/image?${qs}`)).status, 200);
 });
+
+// ---- /api/history: paging, mode, prompt extraction ----
+
+const { modeFromFilename, extractFromGraph } = require('../src/server/historyMeta');
+
+async function generate(base, prompt) {
+  const res = await fetch(`${base}/api/generate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, steps: 7, seed: 42, width: 512, height: 640 }),
+  });
+  return waitDone(base, (await res.json()).job.id);
+}
+
+test('modeFromFilename maps output prefixes', () => {
+  assert.strictEqual(modeFromFilename('embernest_gen_abc_00001_.png'), 'generate');
+  assert.strictEqual(modeFromFilename('pixelkiln_gen_abc_00001_.png'), 'generate');
+  assert.strictEqual(modeFromFilename('embernest_tf_abc_00001_.png'), 'transform');
+  assert.strictEqual(modeFromFilename('embernest_lq3k_00001_.png'), 'edit');
+  assert.strictEqual(modeFromFilename('pixelkiln_00001_.png'), 'edit');
+  assert.strictEqual(modeFromFilename('ComfyUI_00001_.png'), null);
+  assert.strictEqual(modeFromFilename(undefined), null);
+});
+
+test('extractFromGraph reads prompt, settings and the before image', () => {
+  const graph = {
+    1: { class_type: 'LoadImage', inputs: { image: 'embernest/in 1.png' } },
+    2: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: 'm.safetensors' } },
+    3: { class_type: 'LoraLoader', inputs: { lora_name: 'l.safetensors', strength_model: 0.7 } },
+    4: { class_type: 'CLIPTextEncode', inputs: { text: 'neg words', clip: ['2', 1] } },
+    5: { class_type: 'CLIPTextEncode', inputs: { text: 'a red fox', clip: ['2', 1] } },
+    6: { class_type: 'KSampler', inputs: { seed: 9, steps: 12, cfg: 6.5, sampler_name: 'euler', scheduler: 'normal', denoise: 0.6, positive: ['5', 0], negative: ['4', 0] } },
+    7: { class_type: 'ImageScale', _meta: { title: 'Restore to 800x600' }, inputs: { width: 800, height: 600 } },
+  };
+  const m = extractFromGraph(graph);
+  assert.strictEqual(m.prompt, 'a red fox');
+  assert.deepStrictEqual(m.before, { filename: 'in 1.png', subfolder: 'embernest' });
+  assert.strictEqual(m.settings.negative, 'neg words');
+  assert.strictEqual(m.settings.checkpoint, 'm.safetensors');
+  assert.strictEqual(m.settings.lora, 'l.safetensors');
+  assert.strictEqual(m.settings.seed, 9);
+  assert.strictEqual(m.settings.width, 800);
+  assert.deepStrictEqual(extractFromGraph({}).settings.seed, null);
+});
+
+test('GET /api/history pages newest first and reports mode and prompt', async (t) => {
+  const { base } = await setup(t);
+  for (const p of ['one', 'two', 'three']) await generate(base, p);
+  const all = await (await fetch(`${base}/api/history?limit=2`)).json();
+  assert.strictEqual(all.items.length, 2);
+  assert.strictEqual(all.total, 3);
+  assert.strictEqual(all.hasMore, true);
+  assert.strictEqual(all.items[0].prompt, 'three');
+  assert.strictEqual(all.items[0].mode, 'generate');
+  assert.strictEqual(all.items[0].settings.seed, 42);
+  assert.strictEqual(all.items[0].settings.width, 512);
+  assert.strictEqual(all.items[0].settings.height, 640);
+  assert.ok(all.items[0].createdAt > 0);
+  assert.strictEqual(all.items[0].before, null);
+  const rest = await (await fetch(`${base}/api/history?limit=2&offset=2`)).json();
+  assert.deepStrictEqual(rest.items.map((i) => i.prompt), ['one']);
+  assert.strictEqual(rest.hasMore, false);
+  const none = await (await fetch(`${base}/api/history?mode=edit`)).json();
+  assert.deepStrictEqual(none.items, []);
+});
+
+test('history reports transform mode with a before image, and hides held edits', async (t) => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  let checking = false;
+  const SLOW = { check: async () => { checking = true; await gate; return { nsfwScore: 0, blocked: false }; }, close() {} };
+  const { base } = await setup(t, { safety: SLOW });
+  const res = await fetch(`${base}/api/transform`, { method: 'POST', body: editForm() });
+  const { id } = (await res.json()).job;
+  for (let i = 0; i < 200 && !checking; i++) await new Promise((r) => setTimeout(r, 25));
+  assert.deepStrictEqual((await (await fetch(`${base}/api/history`)).json()).items, [], 'held while checking');
+  release();
+  await waitDone(base, id);
+  const h = await (await fetch(`${base}/api/history?mode=transform`)).json();
+  assert.strictEqual(h.items.length, 1);
+  assert.strictEqual(h.items[0].mode, 'transform');
+  assert.match(h.items[0].before, /^\/api\/image\?.*type=input/);
+});
+
+test('cancelling a queued job does not interrupt the job ComfyUI is running', async () => {
+  const jobsMod = require('../src/server/jobs');
+  const calls = [];
+  const client = {
+    queuePrompt: () => new Promise(() => {}), // never starts
+    interrupt: async () => { calls.push('interrupt'); },
+    deleteFromQueue: async () => { calls.push('delete'); },
+  };
+  const queued = jobsMod.startJob({ kind: 'generate', client, buildWorkflow: () => ({}) });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual((await jobsMod.cancelJob(queued.id, client)).status, 'cancelled');
+  assert.ok(!calls.includes('interrupt'));
+});

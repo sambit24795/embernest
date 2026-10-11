@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/css/screens.css" />
   <link rel="stylesheet" href="/css/chat.css" />
   <link rel="stylesheet" href="/css/guide.css" />
+  <link rel="stylesheet" href="/css/gallery.css" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#0d0f12" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
@@ -37,6 +38,8 @@
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z"/></svg><span>Chat</span></a>
       <a class="nav-item" href="#tab=create" data-nav="create">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg><span>Create</span></a>
+      <a class="nav-item" href="#tab=gallery" data-nav="gallery">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg><span>Gallery</span></a>
       <a class="nav-item" href="#tab=models" data-nav="models">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><span>Models</span></a>
       <a class="nav-item" href="#tab=settings" data-nav="settings">
@@ -283,60 +286,7 @@
           </div>
         </div>
 
-        <div class="create-out">
-          <div class="card result-card">
-            <div class="result-head">
-              <h2>Result</h2>
-              <div class="result-actions">
-                <button class="btn btn-ghost btn-sm" id="genReuseBtn" type="button" hidden>Reuse settings</button>
-                <button class="btn btn-ghost btn-sm" id="genDownloadBtn" type="button" hidden>Download</button>
-                <button class="btn btn-ghost btn-sm btn-danger-text" id="genDeleteBtn" type="button" hidden>Delete</button>
-              </div>
-            </div>
-
-            <div class="result-stage">
-              <div class="empty" id="genResultPlaceholder">
-                <svg class="empty-art" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
-                <h3>Your image will appear here</h3>
-                <p>Describe what you want, then press Generate.</p>
-              </div>
-
-              <div class="loading" id="genResultLoading" hidden>
-                <p class="loading-phase" id="genPhase">Heating the kiln&hellip;</p>
-                <div class="progress"><div class="progress-fill" id="genProgressFill"></div></div>
-                <div class="loading-row">
-                  <span class="hint" id="genProgressText">starting&hellip;</span>
-                  <button class="btn btn-ghost btn-sm" id="genCancelBtn" type="button">Cancel</button>
-                </div>
-              </div>
-
-              <div class="note note-danger error-panel" id="genResultError" hidden>
-                <strong class="error-title">Generation failed</strong>
-                <p id="genResultErrorText"></p>
-              </div>
-              <div class="compare" id="genCompare" hidden>
-                <img class="compare-img after" id="genCompareAfter" alt="Generated" />
-                <div class="compare-handle" id="genCompareHandle" hidden><span class="compare-knob">&#8660;</span></div>
-              </div>
-            </div>
-            <details class="output-meta" id="genOutputMeta" hidden>
-              <summary>Details</summary>
-              <dl class="specs" id="genOutputMetaList"></dl>
-            </details>
-          </div>
-
-          <div class="card recent-card">
-            <div class="result-head">
-              <h2>Recent</h2>
-              <div class="result-actions">
-                <button class="btn btn-ghost btn-sm" id="genRefreshQueue" type="button">Refresh</button>
-                <button class="btn btn-ghost btn-sm" id="genInterruptBtn" type="button">Interrupt</button>
-              </div>
-            </div>
-            <p class="hint queue-status" id="genQueueStatus">&mdash;</p>
-            <div class="history-grid" id="genHistoryGrid"></div>
-          </div>
-        </div>
+        <div class="create-out" data-feed-slot></div>
       </div>
     </section>
 
@@ -433,65 +383,7 @@
           </div>
         </div>
 
-        <div class="create-out">
-          <div class="card result-card">
-            <div class="result-head">
-              <h2>Result</h2>
-              <div class="result-actions">
-                <button class="btn btn-ghost btn-sm" id="tfReuseBtn" type="button" hidden>Reuse settings</button>
-                <button class="btn btn-ghost btn-sm" id="tfDownloadBtn" type="button" hidden>Download</button>
-                <button class="btn btn-ghost btn-sm btn-danger-text" id="tfDeleteBtn" type="button" hidden>Delete</button>
-              </div>
-            </div>
-
-            <div class="result-stage">
-              <div class="empty" id="tfResultPlaceholder">
-                <svg class="empty-art" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
-                <h3>Your transformed image will appear here</h3>
-                <p>Add a photo, describe the style, then press Transform.</p>
-              </div>
-
-              <div class="loading" id="tfResultLoading" hidden>
-                <p class="loading-phase" id="tfPhase">Heating the kiln&hellip;</p>
-                <div class="progress"><div class="progress-fill" id="tfProgressFill"></div></div>
-                <div class="loading-row">
-                  <span class="hint" id="tfProgressText">starting&hellip;</span>
-                  <button class="btn btn-ghost btn-sm" id="tfCancelBtn" type="button">Cancel</button>
-                </div>
-              </div>
-
-              <div class="note note-danger error-panel" id="tfResultError" hidden>
-                <strong class="error-title">Transform failed</strong>
-                <p id="tfResultErrorText"></p>
-              </div>
-              <div class="compare" id="tfCompare" hidden>
-                <img class="compare-img after" id="tfCompareAfter" alt="After" />
-                <img class="compare-img before" id="tfCompareBefore" alt="Before (original)" />
-                <div class="compare-handle" id="tfCompareHandle" role="slider" aria-label="Compare before and after" aria-valuemin="0" aria-valuemax="100" tabindex="0">
-                  <span class="compare-knob">&#8660;</span>
-                </div>
-                <span class="compare-tag before-tag" id="tfCompareBeforeTag">Before</span>
-                <span class="compare-tag after-tag">After</span>
-              </div>
-            </div>
-            <details class="output-meta" id="tfOutputMeta" hidden>
-              <summary>Details</summary>
-              <dl class="specs" id="tfOutputMetaList"></dl>
-            </details>
-          </div>
-
-          <div class="card recent-card">
-            <div class="result-head">
-              <h2>Recent</h2>
-              <div class="result-actions">
-                <button class="btn btn-ghost btn-sm" id="tfRefreshQueue" type="button">Refresh</button>
-                <button class="btn btn-ghost btn-sm" id="tfInterruptBtn" type="button">Interrupt</button>
-              </div>
-            </div>
-            <p class="hint queue-status" id="tfQueueStatus">&mdash;</p>
-            <div class="history-grid" id="tfHistoryGrid"></div>
-          </div>
-        </div>
+        <div class="create-out" data-feed-slot></div>
       </div>
     </section>
 
@@ -602,67 +494,59 @@
           </div>
         </div>
 
-        <div class="create-out">
-          <div class="card result-card">
-            <div class="result-head">
-              <h2>Result</h2>
-              <div class="result-actions">
-                <button class="btn btn-ghost btn-sm" id="reuseEditBtn" type="button" hidden>Reuse settings</button>
-                <button class="btn btn-ghost btn-sm" id="downloadResultBtn" type="button" hidden>Download</button>
-                <button class="btn btn-ghost btn-sm btn-danger-text" id="deleteEditBtn" type="button" hidden>Delete</button>
-              </div>
-            </div>
-
-            <div class="result-stage">
-              <div class="empty" id="resultPlaceholder">
-                <svg class="empty-art" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
-                <h3>Your edit will appear here</h3>
-                <p>Add a photo, describe the change, then press Forge.</p>
-              </div>
-
-              <div class="loading" id="resultLoading" hidden>
-                <p class="loading-phase" id="editPhase">Heating the kiln&hellip;</p>
-                <div class="progress"><div class="progress-fill" id="editProgressFill"></div></div>
-                <div class="loading-row">
-                  <span class="hint" id="editProgressText">starting&hellip;</span>
-                  <button class="btn btn-ghost btn-sm" id="cancelEditBtn" type="button">Cancel</button>
-                </div>
-              </div>
-
-              <div class="note note-danger error-panel" id="resultError" hidden>
-                <strong class="error-title">Forge failed</strong>
-                <p id="resultErrorText"></p>
-              </div>
-              <div class="compare" id="compare" hidden>
-                <img class="compare-img after" id="compareAfter" alt="After" />
-                <img class="compare-img before" id="compareBefore" alt="Before (original)" />
-                <div class="compare-handle" id="compareHandle" role="slider" aria-label="Compare before and after" aria-valuemin="0" aria-valuemax="100" tabindex="0">
-                  <span class="compare-knob">&#8660;</span>
-                </div>
-                <span class="compare-tag before-tag" id="compareBeforeTag">Before</span>
-                <span class="compare-tag after-tag">After</span>
-              </div>
-            </div>
-            <details class="output-meta" id="outputMeta" hidden>
-              <summary>Details</summary>
-              <dl class="specs" id="outputMetaList"></dl>
-            </details>
-          </div>
-
-          <div class="card recent-card">
-            <div class="result-head">
-              <h2>Recent</h2>
-              <div class="result-actions">
-                <button class="btn btn-ghost btn-sm" id="refreshQueue" type="button">Refresh</button>
-                <button class="btn btn-ghost btn-sm" id="interruptBtn" type="button">Interrupt</button>
-              </div>
-            </div>
-            <p class="hint queue-status" id="queueStatus">&mdash;</p>
-            <div class="history-grid" id="historyGrid"></div>
-          </div>
-        </div>
+        <div class="create-out" data-feed-slot></div>
       </div>
     </section>
+
+    <!-- ===================== GALLERY ===================== -->
+    <section class="panel-page" id="tab-gallery" role="tabpanel" aria-label="Gallery" hidden>
+      <div class="page-head">
+        <h1>Gallery</h1>
+        <p class="muted">Everything you have made, newest first.</p>
+      </div>
+      <div class="gallery-bar">
+        <div class="chip-row" id="galleryFilters" role="group" aria-label="Filter by type">
+          <a class="chip" href="#tab=gallery" data-gmode="">All</a>
+          <a class="chip" href="#tab=gallery&amp;mode=generate" data-gmode="generate">Generate</a>
+          <a class="chip" href="#tab=gallery&amp;mode=transform" data-gmode="transform">Transform</a>
+          <a class="chip" href="#tab=gallery&amp;mode=edit" data-gmode="edit">Edit</a>
+        </div>
+        <button class="btn btn-sm" id="gallerySelectBtn" type="button" aria-pressed="false">Select</button>
+      </div>
+      <div class="select-bar" id="gallerySelectBar" hidden>
+        <span id="gallerySelectCount">0 selected</span>
+        <span class="select-bar-actions">
+          <button class="btn btn-sm btn-danger" id="galleryDeleteSel" type="button" disabled>Delete selected</button>
+          <button class="btn btn-sm btn-ghost" id="galleryCancelSel" type="button">Done</button>
+        </span>
+      </div>
+      <div class="select-bar is-confirm" id="galleryConfirm" hidden>
+        <span id="galleryConfirmText"></span>
+        <span class="select-bar-actions">
+          <button class="btn btn-sm btn-ghost" id="galleryConfirmNo" type="button">Cancel</button>
+          <button class="btn btn-sm btn-danger" id="galleryConfirmYes" type="button">Delete</button>
+        </span>
+      </div>
+      <div class="thumb-grid thumb-grid-lg" id="galleryGrid"></div>
+      <div class="gallery-more" id="galleryMore" hidden>
+        <button class="btn" id="galleryMoreBtn" type="button">Load more</button>
+      </div>
+    </section>
+
+    <!-- Shared live feed: moved into the active Create mode by JS. -->
+    <aside class="feed" id="createFeed" aria-label="Activity" hidden>
+      <section class="card feed-card" id="feedActive" hidden>
+        <div class="result-head"><h2>In progress</h2></div>
+        <div class="job-list" id="feedJobs"></div>
+      </section>
+      <section class="card feed-card">
+        <div class="result-head">
+          <h2>Recent</h2>
+          <a class="btn btn-ghost btn-sm" href="#tab=gallery">See all &rarr;</a>
+        </div>
+        <div class="thumb-grid" id="feedRecent"></div>
+      </section>
+    </aside>
 
     <!-- ===================== MODELS ===================== -->
     <section class="panel-page" id="tab-models" role="tabpanel" aria-label="Models" hidden>
@@ -954,6 +838,36 @@
     </div>
   </section>
 
+  <!-- Image viewer (lightbox on desktop, full screen on phone). -->
+  <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Image viewer" hidden>
+    <div class="viewer-stage" id="viewerStage">
+      <button class="viewer-close btn btn-icon" id="viewerClose" type="button" aria-label="Close viewer">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button class="viewer-nav viewer-prev btn btn-icon" id="viewerPrev" type="button" aria-label="Previous image">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="viewer-media" id="viewerMedia"></div>
+      <button class="viewer-nav viewer-next btn btn-icon" id="viewerNext" type="button" aria-label="Next image">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+    <aside class="viewer-info" id="viewerInfo">
+      <div class="viewer-meta-top"><span class="badge badge-accent" id="viewerMode"></span><span class="hint" id="viewerDate"></span><span class="hint viewer-count" id="viewerCount"></span></div>
+      <p class="viewer-prompt" id="viewerPrompt"></p>
+      <dl class="specs" id="viewerSpecs"></dl>
+      <div class="viewer-actions" id="viewerActions">
+        <button class="btn btn-sm" id="viewerDownload" type="button">Download</button>
+        <button class="btn btn-sm" id="viewerReuse" type="button">Reuse settings</button>
+        <button class="btn btn-sm btn-danger" id="viewerDelete" type="button">Delete</button>
+      </div>
+      <div class="viewer-confirm" id="viewerConfirm" hidden>
+        <span>Delete this image? This can't be undone.</span>
+        <span class="select-bar-actions">
+          <button class="btn btn-sm btn-ghost" id="viewerConfirmNo" type="button">Cancel</button>
+          <button class="btn btn-sm btn-danger" id="viewerConfirmYes" type="button">Delete</button>
+        </span>
+      </div>
+    </aside>
+  </div>
+
   <div class="toast" id="toast" hidden></div>
 
   <!-- Shown when the server answers 401 (this device is not paired yet). -->
@@ -977,6 +891,7 @@
   <script src="/js/explain.js" defer></script>
   <script src="/js/models-guide.js" defer></script>
   <script src="/js/chat.js" defer></script>
+  <script src="/js/gallery.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>
