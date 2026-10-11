@@ -4,7 +4,7 @@ const path = require('path');
 const fsp = require('fs/promises');
 const jobs = require('../jobs');
 const { toNum } = require('../util');
-const { modeFromFilename, extractFromGraph, graphOf, createdAtOf } = require('../historyMeta');
+const { entryFromHistory, outputImages } = require('../gallery-store');
 
 /** ComfyUI queue entries are tuples: [number, promptId, workflow, extra]. */
 function queueItem(entry) {
@@ -14,6 +14,28 @@ function queueItem(entry) {
     clientId: (extra && extra.client_id) || null,
     nodeCount: workflow ? Object.keys(workflow).length : 0,
   };
+}
+
+/**
+ * Index ComfyUI history entries that are not in the gallery yet (never held photo edits).
+ * Throws when ComfyUI can't be reached.
+ */
+async function importLive(ctx) {
+  const all = await ctx.comfy().getAllHistory();
+  const fresh = Object.entries(all || {})
+    .filter(([id]) => !ctx.gallery.has(id) && !jobs.isHeldPrompt(id))
+    .map(([id, entry]) => entryFromHistory(id, entry, { source: 'import' }));
+  return ctx.gallery.add(...fresh);
+}
+
+/** Import live history (if reachable), then scan the output folder. */
+async function syncGallery(ctx) {
+  let imported = 0;
+  try { imported = await importLive(ctx); } catch (_) { /* engine not up yet */ }
+  const scanned = await ctx.gallery.scan(ctx.outputRoot(), {
+    isHeldImage: jobs.isHeldImage, checkedBusy: jobs.hasPendingChecked,
+  });
+  return { imported, ...scanned };
 }
 
 /** @param {import('express').Express} app @param {object} ctx */
@@ -76,7 +98,8 @@ function register(app, ctx) {
 
   /**
    * GET /api/history?limit=12&offset=0&mode=generate|transform|edit
-   * Results (newest first) with proxied image URLs, mode, prompt, key settings,
+   * Results (newest first) from the persistent gallery index, plus any live ComfyUI
+   * results not indexed yet, with proxied image URLs, mode, prompt, key settings,
    * createdAt and, for edit/transform, the `before` image. Held photo edits are hidden.
    */
   app.get('/api/history', async (req, res) => {
@@ -84,30 +107,38 @@ function register(app, ctx) {
       const limit = Math.min(100, Math.max(1, Math.round(toNum(req.query.limit, 12))));
       const offset = Math.max(0, Math.round(toNum(req.query.offset, 0)));
       const wantMode = ['generate', 'transform', 'edit'].includes(req.query.mode) ? req.query.mode : null;
-      const client = comfy();
-      const all = await client.getAllHistory();
-      const visible = Object.entries(all)
-        .map(([promptId, entry]) => {
-          const images = client.collectImages(entry).map((img) => ({ ...img, url: jobs.imageProxyUrl(img) }));
-          const meta = extractFromGraph(graphOf(entry));
-          return {
-            promptId,
-            images,
-            status: (entry.status && entry.status.status_str) || 'success',
-            mode: images.length ? modeFromFilename(images[0].filename) : null,
-            prompt: meta.prompt,
-            settings: meta.settings,
-            createdAt: createdAtOf(entry),
-            before: meta.before ? jobs.imageProxyUrl({ ...meta.before, type: 'input' }) : null,
-          };
-        })
-        .filter((item) => item.images.length && !jobs.isHeldPrompt(item.promptId))
-        .filter((item) => !wantMode || item.mode === wantMode)
-        .reverse();
-      const items = visible.slice(offset, offset + limit);
-      res.json({ items, total: visible.length, hasMore: offset + items.length < visible.length });
+      let liveError = null;
+      try {
+        await importLive(ctx);
+      } catch (err) {
+        liveError = err; // ComfyUI is down: the index still answers
+      }
+      const { items: page, total } = await ctx.gallery.list({
+        mode: wantMode, offset, limit, outputRoot: ctx.outputRoot(), isHidden: (e) => jobs.isHeldPrompt(e.id),
+      });
+      if (liveError && !total) return res.status(502).json({ error: 'Could not read ComfyUI history', detail: liveError.message });
+      const items = page.map((e) => ({
+        promptId: e.id,
+        images: e.images.map((img) => ({ ...img, url: jobs.imageProxyUrl(img) })),
+        status: 'success',
+        mode: e.mode,
+        prompt: e.prompt,
+        settings: e.settings,
+        createdAt: e.createdAt,
+        before: e.before ? jobs.imageProxyUrl({ ...e.before, type: 'input' }) : null,
+      }));
+      res.json({ items, total, hasMore: offset + items.length < total });
     } catch (err) {
-      res.status(502).json({ error: 'Could not read ComfyUI history', detail: err.message });
+      res.status(500).json({ error: 'Could not read the gallery', detail: err.message });
+    }
+  });
+
+  /** POST /api/history/rescan — index ComfyUI's history and the output folder again. */
+  app.post('/api/history/rescan', async (req, res) => {
+    try {
+      res.json({ ok: true, ...(await syncGallery(ctx)), total: ctx.gallery.size() });
+    } catch (err) {
+      res.status(500).json({ error: 'Could not rescan', detail: err.message });
     }
   });
 
@@ -120,14 +151,22 @@ function register(app, ctx) {
     try {
       const promptId = req.params.promptId;
       const client = comfy();
-      const outputDir = await client.getOutputDirectory();
+      let outputDir = ctx.outputRoot(); // the same folder the index and scan use
+      if (!outputDir) {
+        try { outputDir = await client.getOutputDirectory(); } catch (_) { /* engine may be down */ }
+      }
       if (!outputDir) {
         return res.status(409).json({ error: 'Could not determine ComfyUI output directory' });
       }
 
-      const raw = await client.getHistory(promptId);
-      const entry = (raw && raw[promptId]) || raw || {};
-      const images = client.collectImages(entry).filter((i) => i.type === 'output');
+      let entry = {};
+      try {
+        const raw = await client.getHistory(promptId);
+        entry = (raw && raw[promptId]) || raw || {};
+      } catch (_) { /* not in the live history */ }
+      const indexed = ctx.gallery.get(promptId);
+      const images = [...outputImages(entry), ...(indexed ? indexed.images : [])]
+        .filter((img, i, all) => all.findIndex((o) => o.filename === img.filename && (o.subfolder || '') === (img.subfolder || '')) === i);
 
       const root = path.resolve(outputDir) + path.sep;
       const deleted = [];
@@ -147,7 +186,8 @@ function register(app, ctx) {
         }
       }
 
-      await client.deleteHistoryItems([promptId]);
+      try { await client.deleteHistoryItems([promptId]); } catch (_) { /* nothing live to remove */ }
+      ctx.gallery.remove(promptId);
       res.json({ ok: true, promptId, deleted });
     } catch (err) {
       res.status(502).json({ error: 'Could not delete', detail: err.message });
@@ -155,4 +195,4 @@ function register(app, ctx) {
   });
 }
 
-module.exports = { register };
+module.exports = { register, syncGallery };

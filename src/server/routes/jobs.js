@@ -76,6 +76,7 @@ function register(app, ctx) {
         buildWorkflow: buildInpaintWorkflow,
         safety,
         outputRoot: ctx.outputRoot(),
+        onDone: ctx.onResult,
       });
       res.status(202).json({ job });
     } catch (err) {
@@ -179,7 +180,7 @@ function register(app, ctx) {
         timeout: 900000,
       };
 
-      const job = jobs.startJob({ kind: 'transform', client, file: req.file, inputs, buildWorkflow: buildImg2ImgWorkflow, safety, outputRoot: ctx.outputRoot() });
+      const job = jobs.startJob({ kind: 'transform', client, file: req.file, inputs, buildWorkflow: buildImg2ImgWorkflow, safety, outputRoot: ctx.outputRoot(), onDone: ctx.onResult });
       res.status(202).json({ job });
     } catch (err) {
       res.status(502).json({ error: 'Could not start transform', detail: err.message });

@@ -16,6 +16,7 @@ const { createAuth } = require('./auth');
 const { createSafety } = require('./safety');
 const { getMetaStore } = require('./model-meta');
 const { localModelsDir } = require('../core/paths');
+const { createGalleryStore, entryFromHistory, galleryFile } = require('./gallery-store');
 
 const system = require('./routes/system');
 const models = require('./routes/models');
@@ -93,8 +94,14 @@ function createApp({ paths, getConfig = () => loadConfig(paths), supervisor = nu
     return { hw, plan, specs: specsFrom(hw, plan) };
   };
 
+  const gallery = createGalleryStore({ file: galleryFile(paths, getConfig()) });
   const ctx = {
     paths,
+    gallery,
+    /** Called by a finished (approved) job: add its result to the persistent gallery. */
+    onResult: ({ promptId, kind, history }) => {
+      gallery.add(entryFromHistory(promptId, history, { mode: kind }));
+    },
     getConfig,
     saveConfig: (patch) => saveConfig(paths, patch),
     /** Fresh client each call so config edits apply without a restart. */
@@ -122,6 +129,11 @@ function createApp({ paths, getConfig = () => loadConfig(paths), supervisor = nu
       const dir = localModelsDir(paths, getConfig());
       if (dir) getMetaStore(dir).scan();
     } catch (_) { /* metadata is optional */ }
+  });
+
+  // Bring the gallery index up to date in the background: ComfyUI's live history, then the output folder.
+  setImmediate(() => {
+    queue.syncGallery(ctx).catch(() => { /* the gallery is optional */ });
   });
 
   // Multer / body errors -> clean JSON instead of an HTML stack trace.

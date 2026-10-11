@@ -55,7 +55,7 @@ async function startGenerate(ctx, body = {}) {
     timeout: 900000,
   };
 
-  return jobs.startJob({ kind: 'generate', client, inputs, buildWorkflow: buildTxt2ImgWorkflow });
+  return jobs.startJob({ kind: 'generate', client, inputs, buildWorkflow: buildTxt2ImgWorkflow, onDone: ctx.onResult });
 }
 
 module.exports = { startGenerate, GenerateError };

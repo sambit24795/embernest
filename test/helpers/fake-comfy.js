@@ -23,10 +23,11 @@ const combo = (options) => ['COMBO', { options }];
 /**
  * Start an in-process fake ComfyUI (HTTP + WebSocket at /ws) on a random port (or `port`).
  * Only the endpoints Embernest uses are implemented.
- * @param {{ checkpoints?: string[], loras?: string[], failPrompt?: boolean, port?: number }} [opts]
+ * @param {{ checkpoints?: string[], loras?: string[], failPrompt?: boolean, port?: number, outputDir?: string }} [opts]
+ *   outputDir: when set, finished prompts also write their PNG there (like real ComfyUI's SaveImage)
  * @returns {Promise<{ url: string, port: number, calls: string[], modelsDir: string, close: () => Promise<void> }>}
  */
-async function startFakeComfy({ checkpoints = ['a.safetensors'], loras = [], failPrompt = false, port: listenPort = 0 } = {}) {
+async function startFakeComfy({ checkpoints = ['a.safetensors'], loras = [], failPrompt = false, port: listenPort = 0, outputDir = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-comfy-'));
   const modelsDir = path.join(root, 'models');
   for (const name of MODEL_FOLDERS) fs.mkdirSync(path.join(modelsDir, name), { recursive: true });
@@ -77,9 +78,14 @@ async function startFakeComfy({ checkpoints = ['a.safetensors'], loras = [], fai
     }
     const save = Object.values(workflow).find((n) => n && n.class_type === 'SaveImage');
     const prefix = save && save.inputs && save.inputs.filename_prefix;
+    const outName = prefix ? `${prefix}_00001_.png` : `${promptId}.png`;
+    if (outputDir) {
+      fs.mkdirSync(outputDir, { recursive: true });
+      fs.writeFileSync(path.join(outputDir, outName), PNG_1X1);
+    }
     history[promptId] = {
       prompt: [1, promptId, workflow, { client_id: clientId }],
-      outputs: { 9: { images: [{ filename: prefix ? `${prefix}_00001_.png` : `${promptId}.png`, subfolder: '', type: 'output' }] } },
+      outputs: { 9: { images: [{ filename: outName, subfolder: '', type: 'output' }] } },
       status: { status_str: 'success', completed: true, messages: [['execution_start', { prompt_id: promptId, timestamp: Date.now() }]] },
     };
     queue.running = queue.running.filter((e) => e[1] !== promptId);

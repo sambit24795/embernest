@@ -26,10 +26,10 @@ const CONFIG_HW = { ...HARDWARE, gpu: { ...HARDWARE.gpu, name: 'Fake 6GB NVIDIA'
 /** Safety stub: never blocks (the real worker needs Python and a model). */
 const PASS = { check: async () => ({ nsfwScore: 0, blocked: false }), close() {} };
 
-async function setup(t, { supervisor = null, safety = PASS } = {}) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'embernest-home-'));
-  const fake = await startFakeComfy();
+async function setup(t, { supervisor = null, safety = PASS, home: givenHome = null } = {}) {
+  const home = givenHome || fs.mkdtempSync(path.join(os.tmpdir(), 'embernest-home-'));
   const paths = getPaths(home);
+  const fake = await startFakeComfy({ outputDir: paths.output });
   saveConfig(paths, {
     authToken: 'secret-auth-token',
     comfy: { url: fake.url },
@@ -41,9 +41,9 @@ async function setup(t, { supervisor = null, safety = PASS } = {}) {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
     await fake.close();
-    fs.rmSync(home, { recursive: true, force: true });
+    if (!givenHome) fs.rmSync(home, { recursive: true, force: true });
   });
-  return { base: `http://127.0.0.1:${server.address().port}`, fake, paths };
+  return { base: `http://127.0.0.1:${server.address().port}`, fake, paths, home };
 }
 
 async function waitDone(base, id) {
@@ -413,4 +413,128 @@ test('cancelling a queued job does not interrupt the job ComfyUI is running', as
   await new Promise((r) => setTimeout(r, 20));
   assert.strictEqual((await jobsMod.cancelJob(queued.id, client)).status, 'cancelled');
   assert.ok(!calls.includes('interrupt'));
+});
+
+// ---- persistent gallery ----
+
+const zlibMod = require('node:zlib');
+const pngChunk = (type, data) => {
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(data.length, 0);
+  head.write(type, 4, 'latin1');
+  return Buffer.concat([head, data, Buffer.alloc(4)]);
+};
+const pngWithPrompt = (graph) => Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  pngChunk('IHDR', Buffer.alloc(13)),
+  pngChunk('tEXt', Buffer.from(`prompt\0${JSON.stringify(graph)}`, 'latin1')),
+  pngChunk('IDAT', zlibMod.deflateSync(Buffer.from('x'))),
+  pngChunk('IEND', Buffer.alloc(0)),
+]);
+const listHistory = async (base, qs = '') => (await fetch(`${base}/api/history${qs}`)).json();
+const readIndex = (paths) => JSON.parse(fs.readFileSync(path.join(paths.data, 'gallery.json'), 'utf8'));
+
+test('a finished job is recorded in the gallery index (0600) and listed', async (t) => {
+  const { base, paths } = await setup(t);
+  const job = await generate(base, 'a recorded cat');
+  const idx = readIndex(paths);
+  assert.strictEqual(idx.items.length, 1);
+  assert.strictEqual(idx.items[0].id, job.promptId);
+  assert.strictEqual(idx.items[0].source, 'job');
+  assert.strictEqual(idx.items[0].prompt, 'a recorded cat');
+  assert.strictEqual(idx.items[0].mode, 'generate');
+  assert.strictEqual(fs.statSync(path.join(paths.data, 'gallery.json')).mode & 0o777, 0o600);
+  assert.ok(!JSON.stringify(idx).includes('secret-'));
+});
+
+test('blocked and unavailable results are never indexed', async (t) => {
+  for (const safety of [BLOCKING, BROKEN]) {
+    const { base, paths } = await setup(t, { safety });
+    const res = await fetch(`${base}/api/edit`, { method: 'POST', body: editForm() });
+    await waitDone(base, (await res.json()).job.id);
+    const file = path.join(paths.data, 'gallery.json');
+    assert.ok(!fs.existsSync(file) || readIndex(paths).items.length === 0);
+    assert.deepStrictEqual((await listHistory(base)).items, []);
+  }
+});
+
+test('an approved edit is indexed only once done', async (t) => {
+  const { base, paths } = await setup(t);
+  const res = await fetch(`${base}/api/edit`, { method: 'POST', body: editForm() });
+  const job = await waitDone(base, (await res.json()).job.id);
+  assert.strictEqual(job.status, 'done');
+  const idx = readIndex(paths);
+  assert.strictEqual(idx.items.length, 1);
+  assert.strictEqual(idx.items[0].mode, 'edit');
+});
+
+test('results already in ComfyUI history are imported into the index', async (t) => {
+  const { base, fake, paths } = await setup(t);
+  const workflow = {
+    1: { class_type: 'CLIPTextEncode', inputs: { text: 'from comfy' } },
+    9: { class_type: 'SaveImage', inputs: { filename_prefix: 'embernest_gen_imp' } },
+  };
+  await fetch(`${fake.url}/prompt`, { method: 'POST', body: JSON.stringify({ client_id: 'x', prompt: workflow }) });
+  let h;
+  for (let i = 0; i < 80; i += 1) {
+    await new Promise((r) => setTimeout(r, 50));
+    h = await listHistory(base);
+    if (h.items.length) break;
+  }
+  assert.strictEqual(h.items.length, 1);
+  assert.strictEqual(h.items[0].prompt, 'from comfy');
+  assert.strictEqual(readIndex(paths).items[0].source, 'import');
+});
+
+test('rescan adds orphan output files, recovering the prompt from the PNG', async (t) => {
+  const { base, paths } = await setup(t);
+  fs.mkdirSync(paths.output, { recursive: true });
+  const graph = { 2: { class_type: 'CLIPTextEncode', inputs: { text: 'orphan dragon' } }, 3: { class_type: 'KSampler', inputs: { seed: 3, steps: 9, positive: ['2', 0] } } };
+  fs.writeFileSync(path.join(paths.output, 'pixelkiln_gen_abc_00001_.png'), pngWithPrompt(graph));
+  fs.writeFileSync(path.join(paths.output, 'embernest_tf_def_00001_.png'), PNG_1X1); // no prompt chunk
+  fs.writeFileSync(path.join(paths.output, 'ComfyUI_00001_.png'), PNG_1X1); // not ours
+  const r = await (await fetch(`${base}/api/history/rescan`, { method: 'POST' })).json();
+  assert.strictEqual(r.added, 2);
+  const h = await listHistory(base);
+  assert.strictEqual(h.items.length, 2);
+  const gen = h.items.find((i) => i.mode === 'generate');
+  assert.strictEqual(gen.prompt, 'orphan dragon');
+  assert.strictEqual(gen.settings.steps, 9);
+  const tf = h.items.find((i) => i.mode === 'transform');
+  assert.strictEqual(tf.prompt, null);
+  assert.ok(tf.createdAt > 0);
+  assert.strictEqual((await (await fetch(`${base}/api/history/rescan`, { method: 'POST' })).json()).added, 0);
+});
+
+test('DELETE removes the files and the index entry; files deleted elsewhere vanish lazily', async (t) => {
+  const { base, paths } = await setup(t);
+  const a = await generate(base, 'keep');
+  const b = await generate(base, 'delete me');
+  const c = await generate(base, 'vanish');
+  const file = (job) => path.join(paths.output, job.images[0].filename);
+  assert.ok(fs.existsSync(file(b)));
+  const del = await (await fetch(`${base}/api/history/${b.promptId}`, { method: 'DELETE' })).json();
+  assert.strictEqual(del.deleted.length, 1);
+  assert.ok(!fs.existsSync(file(b)));
+  assert.ok(!readIndex(paths).items.some((e) => e.id === b.promptId));
+
+  fs.rmSync(file(c)); // deleted outside the app
+  const h = await listHistory(base);
+  assert.deepStrictEqual(h.items.map((i) => i.promptId), [a.promptId]);
+  assert.strictEqual(h.total, 1);
+  assert.deepStrictEqual(readIndex(paths).items.map((e) => e.id), [a.promptId]);
+});
+
+test('after an engine restart (empty ComfyUI history) earlier results are still listed and deletable', async (t) => {
+  const first = await setup(t);
+  const job = await generate(first.base, 'before restart');
+  const second = await setup(t, { home: first.home }); // new app + new, empty fake ComfyUI
+  assert.deepStrictEqual(Object.keys(await (await fetch(`${second.fake.url}/history`)).json()), []);
+  const h = await listHistory(second.base);
+  assert.strictEqual(h.items.length, 1);
+  assert.strictEqual(h.items[0].promptId, job.promptId);
+  assert.strictEqual(h.items[0].prompt, 'before restart');
+  const del = await (await fetch(`${second.base}/api/history/${job.promptId}`, { method: 'DELETE' })).json();
+  assert.strictEqual(del.deleted.length, 1);
+  assert.deepStrictEqual((await listHistory(second.base)).items, []);
 });

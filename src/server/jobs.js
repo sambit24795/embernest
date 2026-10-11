@@ -205,8 +205,9 @@ async function checkOutputs(client, safety, images) {
  * @param {Function} o.buildWorkflow (inputs) => ComfyUI API-format workflow
  * @param {object|null} [o.safety]  nudity checker (see safety.js); required for edit/transform
  * @param {string|null} [o.outputRoot] ComfyUI's output folder, so blocked files can be deleted
+ * @param {Function|null} [o.onDone] called with {promptId, kind, history} once the job is done (never for blocked/failed)
  */
-async function run(job, { client, file, inputs = {}, buildWorkflow, safety = null, outputRoot = null }) {
+async function run(job, { client, file, inputs = {}, buildWorkflow, safety = null, outputRoot = null, onDone = null }) {
   const resolvedInputs = { ...inputs };
   // Unique output prefix per job. ComfyUI's SaveImage counter scans the output
   // folder and can flap/collide across rapid jobs (overwriting earlier results),
@@ -301,6 +302,9 @@ async function run(job, { client, file, inputs = {}, buildWorkflow, safety = nul
     job.percent = 100;
     job.finishedAt = Date.now();
     update(job, true);
+    if (onDone) {
+      try { onDone({ promptId: job.promptId, kind: job.kind, history }); } catch (_) { /* indexing is best effort */ }
+    }
   } catch (err) {
     if (job.status !== 'cancelled') {
       job.status = 'error';
@@ -327,9 +331,10 @@ async function run(job, { client, file, inputs = {}, buildWorkflow, safety = nul
  * @param {Function} o.buildWorkflow  (inputs) => ComfyUI API-format workflow
  * @param {object|null} [o.safety]    nudity checker; edit/transform fail closed without one
  * @param {string|null} [o.outputRoot] ComfyUI's output folder
+ * @param {Function|null} [o.onDone]  see run()
  * @returns {object} public job snapshot
  */
-function startJob({ kind, client, file = null, inputs = {}, buildWorkflow, safety = null, outputRoot = null }) {
+function startJob({ kind, client, file = null, inputs = {}, buildWorkflow, safety = null, outputRoot = null, onDone = null }) {
   if (typeof buildWorkflow !== 'function') {
     throw new Error('startJob: buildWorkflow must be a function');
   }
@@ -361,7 +366,7 @@ function startJob({ kind, client, file = null, inputs = {}, buildWorkflow, safet
     stop: null,
   };
   jobs.set(job.id, job);
-  run(job, { client, file, inputs, buildWorkflow, safety, outputRoot }); // fire and forget
+  run(job, { client, file, inputs, buildWorkflow, safety, outputRoot, onDone }); // fire and forget
   return snapshot(job);
 }
 
@@ -433,7 +438,13 @@ function isHeldImage({ filename, subfolder = '' }) {
   return false;
 }
 
+/** True while any photo-edit/transform job has not reached a final state. */
+function hasPendingChecked() {
+  return [...jobs.values()].some((j) => CHECKED_KINDS.includes(j.kind) && !['done', 'error', 'cancelled', 'blocked'].includes(j.status));
+}
+
 module.exports = {
+  hasPendingChecked,
   isHeldPrompt,
   isHeldImage,
   startJob,
