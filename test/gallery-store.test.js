@@ -71,7 +71,7 @@ test('store persists atomically with mode 0600 and survives a corrupt file', asy
   });
   const a = createGalleryStore({ file });
   a.add(entry('p1', 'embernest_gen_1_00001_.png', 1), entry('p2', 'embernest_gen_2_00001_.png', 2));
-  assert.strictEqual(fs.statSync(file).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.strictEqual(fs.statSync(file).mode & 0o777, 0o600); // no POSIX modes on Windows
   assert.strictEqual(createGalleryStore({ file }).size(), 2);
   assert.deepStrictEqual((await a.list({ limit: 1 })).items.map((e) => e.id), ['p2']);
 

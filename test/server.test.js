@@ -443,7 +443,7 @@ test('a finished job is recorded in the gallery index (0600) and listed', async 
   assert.strictEqual(idx.items[0].source, 'job');
   assert.strictEqual(idx.items[0].prompt, 'a recorded cat');
   assert.strictEqual(idx.items[0].mode, 'generate');
-  assert.strictEqual(fs.statSync(path.join(paths.data, 'gallery.json')).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.strictEqual(fs.statSync(path.join(paths.data, 'gallery.json')).mode & 0o777, 0o600); // no POSIX modes on Windows
   assert.ok(!JSON.stringify(idx).includes('secret-'));
 });
 
