@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- `install.sh` offers to add `~/.local/bin` to PATH in your shell startup file
+  (`EMBERNEST_MODIFY_PATH=1` to do it without asking, `EMBERNEST_NO_MODIFY_PATH=1` to never touch it).
+
 ## 0.2.0
 
 - One-command install: `npm i -g embernest`, or the `install.sh` / `install.ps1` scripts

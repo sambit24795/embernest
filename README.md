@@ -33,6 +33,11 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/sambit24795/embernest/main/install/install.ps1 | iex
 ```
 
+The Linux/macOS script puts `embernest` in `~/.local/bin` and, if that folder isn't on
+your PATH yet, offers to add it to your shell's startup file (`~/.bashrc`, `~/.zshrc`,
+fish config or `~/.profile`). The Windows script adds it to your user PATH. Open a new
+terminal afterwards.
+
 Setup does not download a creative model (a checkpoint, LoRA or embedding). Open the
 printed address in a browser, or scan the QR code with your phone (see
 [docs/phone.md](docs/phone.md)). The app shows a welcome screen with a few starting

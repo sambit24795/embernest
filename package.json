@@ -1,6 +1,6 @@
 {
   "name": "embernest",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Private local AI studio: image generation and editing plus a chat companion, installed with one command.",
   "repository": {
     "type": "git",

@@ -10,6 +10,8 @@
 #                                https://codeload.github.com/sambit24795/embernest/tar.gz/main
 #   EMBERNEST_BIN_DIR            where the `embernest` shim goes (default: ~/.local/bin)
 #   EMBERNEST_NO_SETUP=1         do not run `embernest setup` at the end
+#   EMBERNEST_MODIFY_PATH=1      add the bin dir to your shell startup file without asking
+#   EMBERNEST_NO_MODIFY_PATH=1   never edit shell startup files (just print the line)
 #   EMBERNEST_FORCE_NODE_DOWNLOAD=1  ignore any Node on PATH (used for testing)
 # The old PIXELKILN_* names are still accepted. An existing PixelKiln data folder is reused.
 set -eu
@@ -155,17 +157,49 @@ cp "$BIN_DIR/embernest" "$BIN_DIR/pixelkiln"
 chmod 755 "$BIN_DIR/pixelkiln"
 say "Installed $BIN_DIR/embernest (and $BIN_DIR/pixelkiln as an alias)"
 
+# --- 5b. PATH ----------------------------------------------------------------
+# Offer to add BIN_DIR to the shell's startup file. EMBERNEST_MODIFY_PATH=1 adds it
+# without asking; EMBERNEST_NO_MODIFY_PATH=1 never touches startup files.
+case "${SHELL:-}" in
+  */fish) RC_FILE="$HOME/.config/fish/config.fish"; RC_LINE="fish_add_path \"$BIN_DIR\"" ;;
+  */zsh)  RC_FILE="$HOME/.zshrc";  RC_LINE="export PATH=\"$BIN_DIR:\$PATH\"" ;;
+  */bash) RC_FILE="$HOME/.bashrc"; RC_LINE="export PATH=\"$BIN_DIR:\$PATH\"" ;;
+  *)      RC_FILE="$HOME/.profile"; RC_LINE="export PATH=\"$BIN_DIR:\$PATH\"" ;;
+esac
+
+add_to_path() {
+  mkdir -p "$(dirname "$RC_FILE")"
+  if [ -f "$RC_FILE" ] && grep -F "$BIN_DIR" "$RC_FILE" >/dev/null 2>&1; then
+    say "$RC_FILE already adds $BIN_DIR to PATH."
+  else
+    printf '\n# Added by the Embernest installer\n%s\n' "$RC_LINE" >> "$RC_FILE"
+    say "Added $BIN_DIR to PATH in $RC_FILE."
+  fi
+  say "Open a new terminal (or run: $RC_LINE) to use 'embernest' there."
+}
+
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
   *)
     say ""
-    say "$BIN_DIR is not on your PATH. Add it with:"
-    case "${SHELL:-}" in
-      */fish) say "  fish_add_path \"$BIN_DIR\"" ;;
-      */zsh)  say "  echo 'export PATH=\"$BIN_DIR:\$PATH\"' >> ~/.zshrc" ;;
-      *)      say "  echo 'export PATH=\"$BIN_DIR:\$PATH\"' >> ~/.bashrc" ;;
-    esac
-    say "then open a new terminal."
+    say "$BIN_DIR is not on your PATH."
+    if [ "$(env_or_legacy NO_MODIFY_PATH)" = 1 ]; then
+      say "Add it yourself with:  echo '$RC_LINE' >> $RC_FILE"
+    elif [ "$(env_or_legacy MODIFY_PATH)" = 1 ]; then
+      add_to_path
+    elif ( : </dev/tty ) 2>/dev/null; then
+      printf 'Add it to %s? [Y/n] ' "$RC_FILE" > /dev/tty
+      read -r answer < /dev/tty || answer=n
+      case "$answer" in
+        [nN]*) say "OK. Add it later with:  echo '$RC_LINE' >> $RC_FILE" ;;
+        *) add_to_path ;;
+      esac
+    else
+      say "Add it with:  echo '$RC_LINE' >> $RC_FILE  then open a new terminal."
+    fi
+    # The rest of this script (setup) can use it right away.
+    PATH="$BIN_DIR:$PATH"
+    export PATH
     ;;
 esac
 
